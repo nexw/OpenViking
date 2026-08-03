@@ -10,10 +10,16 @@ from __future__ import annotations
 
 from typing import Any
 
+from openviking.integrations.langchain.actor_peer import (
+    has_request_actor_peer_support,
+)
+
 __all__ = [
     "InMemoryOpenVikingClient",
     "OpenVikingChatMessageHistory",
+    "OpenVikingCancellationProgress",
     "OpenVikingCommitPolicy",
+    "OpenVikingContextRunnable",
     "OpenVikingContextMiddleware",
     "OpenVikingPartialWriteError",
     "OpenVikingRecordResult",
@@ -22,6 +28,8 @@ __all__ = [
     "OpenVikingSessionRecorder",
     "OpenVikingStore",
     "create_openviking_tools",
+    "get_openviking_cancellation_progress",
+    "has_request_actor_peer_support",
     "with_openviking_context",
 ]
 
@@ -47,6 +55,10 @@ def __getattr__(name: str) -> Any:
         from openviking.integrations.langchain.context import OpenVikingSessionContextAssembler
 
         return OpenVikingSessionContextAssembler
+    if name == "OpenVikingContextRunnable":
+        from openviking.integrations.langchain.context import OpenVikingContextRunnable
+
+        return OpenVikingContextRunnable
     if name == "OpenVikingSessionRecorder":
         from openviking.integrations.langchain.recording import OpenVikingSessionRecorder
 
@@ -59,6 +71,18 @@ def __getattr__(name: str) -> Any:
         from openviking.integrations.langchain.recording import OpenVikingRecordResult
 
         return OpenVikingRecordResult
+    if name == "OpenVikingCancellationProgress":
+        from openviking.integrations.langchain.recording import (
+            OpenVikingCancellationProgress,
+        )
+
+        return OpenVikingCancellationProgress
+    if name == "get_openviking_cancellation_progress":
+        from openviking.integrations.langchain.recording import (
+            get_openviking_cancellation_progress,
+        )
+
+        return get_openviking_cancellation_progress
     if name == "OpenVikingCommitPolicy":
         from openviking.integrations.langchain.client import OpenVikingCommitPolicy
 

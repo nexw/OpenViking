@@ -1495,8 +1495,11 @@ async def test_v3_training_links_case_to_trajectory_and_experience_via_trajector
     assert any(link["from_uri"] == case_uri for link in exp_file.backlinks)
     assert fs.commits == [
         {
-            "message": "Update experience memories from session commit archive_001",
-            "paths": [exp_uri, deleted_exp_uri],
+            "message": (
+                "Update experience memories from session commit "
+                "viking://user/u/sessions/session-1/history/archive_001"
+            ),
+            "paths": ["viking://user/u/memories/experiences"],
             "ctx": _ctx(),
         }
     ]

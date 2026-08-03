@@ -104,17 +104,17 @@ async def _commit_experience_snapshot(
     commit = getattr(viking_fs, "commit", None)
     if not callable(commit):
         return
-    paths = [
-        uri
+    has_experience_changes = any(
+        "/memories/experiences/" in uri and uri.endswith(".md")
         for uri in dict.fromkeys(str(uri or "") for uri in experience_uris)
-        if "/memories/experiences/" in uri and uri.endswith(".md")
-    ]
-    if not paths:
+    )
+    if not has_experience_changes:
         return
-    archive_name = archive_uri.rstrip("/").rsplit("/", 1)[-1] if archive_uri else "unknown"
+    paths = [_experience_root_uri(ctx)]
+    archive_ref = archive_uri.rstrip("/") if archive_uri else "unknown"
     try:
         await commit(
-            message=f"Update experience memories from session commit {archive_name}",
+            message=f"Update experience memories from session commit {archive_ref}",
             paths=paths,
             ctx=ctx,
         )
@@ -184,7 +184,6 @@ class SessionCompressorV3:
         return MemoryUpdater(
             registry=registry,
             vikingdb=self.vikingdb,
-            transaction_handle=transaction_handle,
         )
 
     async def _build_memory_diff(

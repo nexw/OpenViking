@@ -75,7 +75,18 @@ workspace；切换 workspace 前应先关闭或 reset 当前 client。
 `aclear()`；`OpenVikingSessionRecorder` 提供 `arecord()`、`aflush()` 和
 `aclose()`。异步 LangGraph 运行会自动选择 `awrap_model_call()` 和
 `aafter_agent()`。同一 adapter 首次被并发调用时，每个 event loop 只会创建一个内部
-HTTP client。
+HTTP client。通过 `with_openviking_context()` 执行的每次 runnable 调用都独立持有
+本次写入所需的 history 快照、peer 身份和召回上下文引用。因此，同一 session 的调用
+可以并发执行，不会因为
+退出时再次读取实时 history 而丢失消息；未消费完的 stream 也不会占用 session 级
+lifecycle lock。只有最终的 append-and-commit 步骤会被串行化：async 写入在每个
+event loop 内按 session 串行执行，sync 写入则会跨线程按 session 串行执行。
+
+如果 recorder 已确认部分写入后任务被取消，`arecord()` 会重新抛出原始
+`asyncio.CancelledError`。可将该异常或外层的 `asyncio.TimeoutError` 传给
+`get_openviking_cancellation_progress()`，在重试前读取已确认写入的消息前缀或待
+commit 状态，避免重复写入。保留原始取消异常也会保留 `asyncio.wait_for()` 和
+`asyncio.timeout()` 的标准超时行为。
 
 Adapter 不会关闭调用方注入的 client。对于 adapter 自行创建的 client，应按实际使用的组件调用
 `await retriever.aclose()`、`await assembler.aclose()`、
@@ -85,9 +96,31 @@ Adapter 不会关闭调用方注入的 client。对于 adapter 自行创建的 c
 `await recorder.aclose()` 仍能释放全部资源。
 如果条件允许，应在关闭 event loop 前关闭 HTTP-backed adapter；原始 loop 已结束后的
 清理属于 best-effort。
-`with_openviking_context()` 返回 LangChain 标准的
-`RunnableWithMessageHistory`，而该类型没有 close hook。因此长期运行的异步应用使用此
-helper 时，应按上例注入并关闭由调用方管理的异步 client。
+
+`with_openviking_context()` 返回 `OpenVikingContextRunnable`。它兼容 LangChain 的
+`RunnableWithMessageHistory`，并负责管理其创建的 context 和 recording adapter。
+它会在多次调用之间复用按 event loop 隔离的 client，同时继续隔离每次调用的 history、
+peer 身份和召回引用。推荐使用托管生命周期：
+
+```python
+async with with_openviking_context(runnable, url="http://localhost:1933") as chain:
+    result = await chain.ainvoke(
+        {"messages": [...]},
+        config={"configurable": {"session_id": "support-thread-1"}},
+    )
+```
+
+同步调用使用 `with ...`，也可以显式调用 `close()` 或 `await aclose()`。不要在正在运行的
+event loop 中调用 `close()`，此时应使用 `aclose()`。注入的 client 仍由调用方管理。
+
+LCEL 组合会返回普通的 `RunnableSequence`，不会暴露 OpenViking 的 close 方法。应保留
+托管 wrapper，并在其生命周期内完成组合：
+
+```python
+async with with_openviking_context(runnable, url="http://localhost:1933") as managed:
+    chain = managed | another_step
+    result = await chain.ainvoke(...)
+```
 
 ## Peer 身份
 
@@ -114,6 +147,42 @@ chain.invoke(
     config={"configurable": {"session_id": "support-thread-1", "peer_id": "assistant-a"}},
 )
 ```
+
+### 并发 Agent 的运行时 Actor Peer
+
+`OpenVikingContextMiddleware` 可以在复用绑定凭证的 HTTP client 时，从每次
+LangGraph 运行中解析当前 actor peer：
+
+```python
+from openviking.integrations.langchain import OpenVikingContextMiddleware
+
+
+def resolve_actor_peer(_state, runtime):
+    context = runtime.context or {}
+    return context.get("actor_peer_id")
+
+
+middleware = OpenVikingContextMiddleware(
+    url="http://localhost:1933",
+    api_key="user-api-key",
+    actor_peer_resolver=resolve_actor_peer,
+)
+```
+
+解析出的 actor peer 会作用于召回和捕获期间发出的 OpenViking HTTP 请求。并发运行
+互相隔离，middleware 的捕获进度也会按 actor peer、session 和 message peer 共同
+隔离。OpenViking 的 Session 接口仍然以 user 为作用域，不会使用 actor-peer header
+标记消息归属；如果捕获的消息也需要归属于同一个逻辑 peer，应同时设置
+`peer_id_resolver`。拥有独立历史的不同 peer 也应解析为不同的 session ID。未传入
+`actor_peer_resolver` 时，现有固定 client 行为保持不变。
+
+该 resolver 不能改变 OpenViking account 或 user；这些身份继续由 API Key 或 OAuth
+凭证决定。因此，多用户应用必须先选择绑定对应用户凭证的 client，再调用 middleware。
+Actor peer 只能从已经认证、由服务端控制的 runtime 字段中解析；不要信任 model state
+或客户端可控的 configurable 值。运行时 actor-peer 解析仅支持 HTTP-backed
+middleware，不支持 embedded `path=` client。注入的自定义 client 必须设置
+`supports_request_actor_peer = True`，并遵循 `openviking_sdk` 的 actor-peer
+作用域。在已有环境中启用该能力前，应同时升级 `openviking-sdk` 和 `openviking`。
 
 ## 选哪个适配器？
 
@@ -145,11 +214,12 @@ from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 from openviking.integrations.langchain import with_openviking_context
 
-chain = with_openviking_context(
+with with_openviking_context(
     RunnableLambda(lambda msgs: AIMessage(content="...")),
     url="http://localhost:1933",
     api_key="...",
-)
+) as chain:
+    result = chain.invoke(...)
 ```
 
 ### Agent tools
