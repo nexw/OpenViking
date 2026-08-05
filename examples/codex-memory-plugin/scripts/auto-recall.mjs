@@ -13,11 +13,11 @@
  * is just `{}`.
  */
 
-import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadConfig } from "./config.mjs";
+import { trySpawnCodex } from "./codex-launch.mjs";
 import { createLogger } from "./debug-log.mjs";
 import {
   buildCodexExecArgs,
@@ -99,6 +99,7 @@ async function fetchJSON(path, init = {}) {
     if (cfg.sendIdentityHeaders && cfg.account) headers["X-OpenViking-Account"] = cfg.account;
     if (cfg.sendIdentityHeaders && cfg.user) headers["X-OpenViking-User"] = cfg.user;
     if (effectivePeer.peerId) headers["X-OpenViking-Actor-Peer"] = effectivePeer.peerId;
+    if (cfg.userAgent) headers["User-Agent"] = cfg.userAgent;
     const res = await fetch(`${cfg.baseUrl}${path}`, { ...init, headers, signal: controller.signal });
     const body = await res.json().catch(() => null);
     if (!body) return { ok: false, status: res.status };
@@ -415,11 +416,11 @@ async function runCodexCompressor(prompt, profile) {
         OPENVIKING_AUTO_CAPTURE: "0",
         OPENVIKING_RECALL_COMPRESS: "0",
       };
+      let child = null;
+      let timer = null;
       let done = false;
       let timedOut = false;
       let stderr = "";
-      const child = spawn("codex", args, { env, stdio: ["pipe", "ignore", "pipe"] });
-      activeCompressor = child;
       const finish = (value, { runtimeFailed = false } = {}) => {
         if (done) return;
         done = true;
@@ -438,7 +439,15 @@ async function runCodexCompressor(prompt, profile) {
         }
         resolve(value);
       };
-      const timer = setTimeout(() => {
+      const launch = trySpawnCodex(args, { env, stdio: ["pipe", "ignore", "pipe"] });
+      if (launch.error) {
+        logError("compress_spawn", launch.error);
+        finish(null, { runtimeFailed: true });
+        return;
+      }
+      child = launch.child;
+      activeCompressor = child;
+      timer = setTimeout(() => {
         timedOut = true;
         logError("compress_timeout", `timed out after ${cfg.recallCompressTimeoutMs}ms`);
         try {

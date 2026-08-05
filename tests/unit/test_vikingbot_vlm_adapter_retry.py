@@ -6,9 +6,8 @@ import vikingbot.providers.vlm_adapter as vlm_adapter
 from vikingbot.providers.vlm_adapter import VLMProviderAdapter
 from volcenginesdkarkruntime._exceptions import ArkRateLimitError
 
-from openviking.utils.model_retry import (
-    is_retryable_rate_limit_error,
-)
+from openviking.models.vlm.backends.openai_vlm import OpenAIVLM
+from openviking.utils.model_retry import is_retryable_rate_limit_error
 
 
 class _DisabledLangfuse:
@@ -27,6 +26,12 @@ class _FakeVLM:
         if self.failures:
             raise self.failures.pop(0)
         return self.result
+
+
+class _FakeVolcEngineFailoverVLM(_FakeVLM):
+    provider = "volcengine"
+    model = "primary-model"
+    thinking = False
 
 
 class _AsyncChunks:
@@ -113,6 +118,79 @@ async def test_chat_does_not_retry_errors_without_rate_limit_markers(monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_chat_accepts_string_response_from_openai_backend_with_tools(monkeypatch):
+    async def create(**_kwargs):
+        return "plain string response"
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create)),
+    )
+    vlm = OpenAIVLM({"provider": "openai", "model": "gpt-5.6-terra"})
+    monkeypatch.setattr(vlm, "get_async_client", lambda: client)
+    adapter = VLMProviderAdapter(vlm, "gpt-5.6-terra", langfuse_client=_DisabledLangfuse())
+
+    response = await adapter.chat(
+        messages=[{"role": "user", "content": "hello"}],
+        tools=[
+            {
+                "type": "function",
+                "function": {
+                    "name": "test_tool",
+                    "description": "A test tool",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        ],
+    )
+
+    assert response.content == "plain string response"
+    assert response.tool_calls == []
+    assert response.finish_reason == "stop"
+
+
+@pytest.mark.asyncio
+async def test_chat_without_tools_preserves_usage_from_openai_backend(monkeypatch):
+    raw_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content="plain response", tool_calls=None),
+                finish_reason="stop",
+            )
+        ],
+        usage=SimpleNamespace(
+            prompt_tokens=13,
+            completion_tokens=5,
+            total_tokens=18,
+            prompt_tokens_details=None,
+            completion_tokens_details=None,
+        ),
+    )
+
+    async def create(**kwargs):
+        assert "tools" not in kwargs
+        return raw_response
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create)),
+    )
+    vlm = OpenAIVLM({"provider": "openai", "model": "gpt-5.6-terra"})
+    monkeypatch.setattr(vlm, "get_async_client", lambda: client)
+    adapter = VLMProviderAdapter(vlm, "gpt-5.6-terra", langfuse_client=_DisabledLangfuse())
+
+    response = await adapter.chat(messages=[{"role": "user", "content": "hello"}])
+
+    assert response.content == "plain response"
+    assert response.tool_calls == []
+    assert response.finish_reason == "stop"
+    assert response.usage == {
+        "prompt_tokens": 13,
+        "completion_tokens": 5,
+        "total_tokens": 18,
+        "prompt_tokens_details": None,
+    }
+
+
+@pytest.mark.asyncio
 async def test_chat_stream_retries_rate_limit_until_success(monkeypatch):
     sleep_delays: list[float] = []
 
@@ -154,6 +232,27 @@ async def test_chat_stream_retries_rate_limit_until_success(monkeypatch):
     assert events[0].content == "streamed"
     assert events[1].response.content == "streamed"
     assert events[1].response.finish_reason == "stop"
+
+
+@pytest.mark.asyncio
+async def test_chat_stream_routes_failover_wrapper_through_completion_api():
+    fake_vlm = _FakeVolcEngineFailoverVLM([], result="fallback-safe")
+    adapter = VLMProviderAdapter(
+        fake_vlm,
+        "primary-model",
+        langfuse_client=_DisabledLangfuse(),
+    )
+
+    events = [
+        event
+        async for event in adapter.chat_stream(
+            messages=[{"role": "user", "content": "hello"}],
+        )
+    ]
+
+    assert fake_vlm.calls == 1
+    assert [event.type for event in events] == ["response"]
+    assert events[0].response.content == "fallback-safe"
 
 
 def test_rate_limit_classifier_handles_target_error():

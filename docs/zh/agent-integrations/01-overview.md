@@ -15,8 +15,9 @@ OpenViking 可以作为多种 Agent 运行时的长期记忆与上下文后端�
 | **OpenCode** | [OpenCode 插件](./10-opencode.md) — MCP 工具 + 生命周期 hooks，覆盖仓库上下文、自动召回与捕获 |
 | **pi** | [pi Coding Agent 扩展](./11-pi.md) — 原生扩展，自动召回、逐轮捕获与阈值 commit |
 | **LangChain / LangGraph** | [LangChain 和 LangGraph](./07-langchain-langgraph.md) — retriever、tools、context backend、store 和 middleware |
+| **多个本地开发 Agent / 希望使用桌面界面** | [OpenViking Helper](./14-openviking-helper.md) — 可视化完成 Agent 接入、会话分析和记忆管理 |
 | **Manus / Claude Desktop / ChatGPT / 其他 MCP 客户端** | [MCP 客户端](./06-mcp-clients.md) — 任何兼容 MCP 的客户端直接对接内置 `/mcp` 端点 |
-| **AstrBot / …** | [社区插件](./08-community-plugins.md) — 社区维护的各运行时集成 |
+| **ZCode / AstrBot / …** | [社区插件](./08-community-plugins.md) — 社区维护的各运行时集成 |
 
 ## 所有集成的共同前置
 

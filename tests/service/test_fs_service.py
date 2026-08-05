@@ -50,17 +50,18 @@ class _FakeWatchManager:
         self,
         from_uri,
         to_uri,
+        account_id,
         move_resource,
         rollback_resource=None,
     ):
-        self.sync_calls.append({"from_uri": from_uri, "to_uri": to_uri})
+        self.sync_calls.append({"from_uri": from_uri, "to_uri": to_uri, "account_id": account_id})
         if self.plan_error:
             raise self.plan_error
         await move_resource()
         return [SimpleNamespace(task_id="watch-1")]
 
-    async def deactivate_tasks_under_uri_internal(self, uri):
-        self.deactivate_calls.append(uri)
+    async def deactivate_tasks_under_uri_internal(self, uri, account_id):
+        self.deactivate_calls.append({"uri": uri, "account_id": account_id})
         return [SimpleNamespace(task_id="watch-1")]
 
 
@@ -135,6 +136,80 @@ def request_context():
         user=UserIdentifier("default", "ryoma"),
         role=Role.USER,
     )
+
+
+@pytest.mark.asyncio
+async def test_read_visible_strips_memory_metadata_before_slicing(request_context):
+    raw = 'line one\nline two\n\n<!-- MEMORY_FIELDS\n{"secret":"hidden"}\n-->'
+    viking_fs = SimpleNamespace(read_file=AsyncMock(return_value=raw))
+    service = FSService(viking_fs=viking_fs)
+    uri = "viking://user/ryoma/memories/notes/private.md"
+
+    assert await service.read_visible(uri, ctx=request_context, offset=3, limit=1) == ""
+    viking_fs.read_file.assert_awaited_once_with(uri, ctx=request_context)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        'visible\n<!-- MEMORY_FIELDS\n{"secret":"hidden"}\n-->',
+        'visible\n\n<!-- MEMORY_FIELDS {"secret":"hidden"} -->',
+        'visible <!-- MEMORY_FIELDS {"secret":"hidden"} -->',
+    ],
+)
+@pytest.mark.asyncio
+async def test_read_visible_strips_supported_memory_metadata_trailers(
+    request_context,
+    raw,
+):
+    uri = "viking://user/ryoma/memories/notes/private.md"
+    service = FSService(
+        viking_fs=SimpleNamespace(read_file=AsyncMock(return_value=raw)),
+    )
+
+    assert await service.read_visible(uri, ctx=request_context) == "visible"
+
+
+@pytest.mark.asyncio
+async def test_read_visible_preserves_non_memory_content(request_context):
+    raw = 'visible\n<!-- MEMORY_FIELDS {"example":true} -->'
+    viking_fs = SimpleNamespace(read_file=AsyncMock(return_value=raw))
+    service = FSService(viking_fs=viking_fs)
+
+    assert (
+        await service.read_visible(
+            "viking://resources/example.md",
+            ctx=request_context,
+            offset=1,
+            limit=1,
+        )
+        == '<!-- MEMORY_FIELDS {"example":true} -->'
+    )
+
+
+@pytest.mark.asyncio
+async def test_grep_projects_memory_content_but_keeps_resource_fast_path(request_context):
+    viking_fs = SimpleNamespace(grep=AsyncMock(return_value={"matches": []}))
+    service = FSService(viking_fs=viking_fs)
+
+    await service.grep(
+        "viking://user/ryoma/memories",
+        "secret",
+        ctx=request_context,
+    )
+    memory_kwargs = viking_fs.grep.await_args.kwargs
+    transform = memory_kwargs["content_transform"]
+    assert (
+        transform(
+            'visible\n<!-- MEMORY_FIELDS {"secret":"hidden"} -->',
+            "viking://user/ryoma/memories/private.md",
+        )
+        == "visible"
+    )
+
+    viking_fs.grep.reset_mock()
+    await service.grep("viking://resources", "secret", ctx=request_context)
+    assert "content_transform" not in viking_fs.grep.await_args.kwargs
 
 
 @pytest.mark.asyncio
@@ -220,7 +295,9 @@ async def test_resource_rm_deactivates_watch_tasks(request_context):
 
     await service.rm("viking://resources/codeask/wiki", ctx=request_context, recursive=True)
 
-    assert watch_manager.deactivate_calls == ["viking://resources/codeask/wiki"]
+    assert watch_manager.deactivate_calls == [
+        {"uri": "viking://resources/codeask/wiki", "account_id": "default"}
+    ]
 
 
 @pytest.mark.asyncio
@@ -256,6 +333,7 @@ async def test_resource_mv_plans_then_moves_then_rewrites_watch_tasks(request_co
         {
             "from_uri": "viking://resources/codeask/wiki",
             "to_uri": "viking://resources/codeask/wiki-renamed",
+            "account_id": "default",
         }
     ]
     assert viking_fs.mv_calls == [

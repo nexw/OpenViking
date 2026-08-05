@@ -7,12 +7,12 @@ mod config_agent;
 mod config_command_ui;
 mod config_wizard;
 mod error;
-mod error_classifier;
 mod error_ui;
 mod handlers;
 mod health_ui;
 mod help_ui;
 mod i18n;
+mod openviking_assets;
 mod output;
 mod status_ui;
 mod terminal_ui;
@@ -119,12 +119,11 @@ struct Cli {
         short,
         long,
         value_enum,
-        default_value = "table",
         global = true,
         hide = true,
         value_name = "table|json"
     )]
-    output: OutputFormat,
+    output: Option<OutputFormat>,
 
     /// Use compact table/JSON rendering
     #[arg(
@@ -281,8 +280,40 @@ enum Commands {
     /// [Data] Add resources into OpenViking
     AddResource {
         /// Local path or URL to import
-        #[arg(value_name = "path-or-url")]
-        path: String,
+        #[arg(
+            value_name = "path-or-url",
+            required_unless_present = "manifest",
+            conflicts_with = "manifest"
+        )]
+        path: Option<String>,
+        /// Apply an OpenViking Assets manifest (openviking-assets/1): create or sync every selected
+        /// asset. Run options go into --args (supported keys: catalog, dry_run, skip_failed)
+        #[arg(
+            short = 'm',
+            long = "manifest",
+            value_name = "file",
+            help_heading = "Common options",
+            conflicts_with_all = [
+                "add_type", "to", "parent", "parent_auto_create",
+                "strict_mode", "ignore_dirs", "include", "exclude",
+                "no_directly_upload_media", "tags", "tag_mode",
+                "reason", "instruction"
+            ]
+        )]
+        manifest: Option<String>,
+        /// Explicit Connector source type (e.g. "tos", "git"). Routes the import
+        /// through the Connector integration (must be enabled server-side); the
+        /// path is sent verbatim and never treated as a local file. Requires --to
+        /// and cannot be combined with --manifest, --parent, or
+        /// --parent-auto-create
+        #[arg(
+            long = "add-type",
+            value_name = "type",
+            requires = "to",
+            conflicts_with_all = ["manifest", "parent", "parent_auto_create"],
+            help_heading = "Common options"
+        )]
+        add_type: Option<String>,
         /// Exact target URI (must not exist yet) (cannot be used with --parent)
         #[arg(long, value_name = "uri", help_heading = "Common options")]
         to: Option<String>,
@@ -317,7 +348,12 @@ enum Commands {
         #[arg(long, help_heading = "Common options")]
         wait: bool,
         /// Wait timeout in seconds (only used with --wait)
-        #[arg(long, value_name = "seconds", help_heading = "Common options")]
+        #[arg(
+            long,
+            value_parser = config::parse_positive_timeout,
+            value_name = "seconds",
+            help_heading = "Common options"
+        )]
         timeout: Option<f64>,
         /// Enable strict mode for directory scanning (fail if any unsupported files found)
         #[arg(
@@ -343,16 +379,33 @@ enum Commands {
         )]
         no_directly_upload_media: bool,
         /// Watch interval in minutes for automatic resource monitoring (0 = no monitoring)
+        #[arg(long, value_name = "minutes", help_heading = "Advanced options")]
+        watch_interval: Option<f64>,
+        /// Resource processing mode
         #[arg(
-            long,
-            default_value = "0",
-            value_name = "minutes",
+            long = "processing-mode",
+            default_value = "semantic_and_vectors",
+            value_parser = ["semantic_and_vectors", "vectors_only"],
             help_heading = "Advanced options"
         )]
-        watch_interval: f64,
-        /// Parser-specific import options, e.g. --args feishu_access_token:u-xxx
+        processing_mode: String,
+        /// Extra options as key:value pairs or a JSON object. With a path/URL:
+        /// parser-specific import options sent to the server, e.g.
+        /// --args feishu_access_token:u-xxx. With --manifest: run options consumed
+        /// locally, e.g. --args dry_run:true (supported keys: catalog, dry_run, skip_failed)
         #[arg(long = "args")]
         resource_args: Option<String>,
+        /// Explicit k=v retrieval tag to apply after import. Can be repeated.
+        #[arg(long = "tag", value_name = "k=v", help_heading = "Common options")]
+        tags: Vec<String>,
+        /// Tag update mode when --tag is provided
+        #[arg(
+            long = "tag-mode",
+            default_value = "replace",
+            value_parser = ["replace", "append"],
+            help_heading = "Common options"
+        )]
+        tag_mode: String,
         #[command(flatten)]
         upload_options: UploadCliOptions,
     },
@@ -365,7 +418,12 @@ enum Commands {
         #[arg(long, help_heading = "Common options")]
         wait: bool,
         /// Wait timeout in seconds
-        #[arg(long, value_name = "seconds", help_heading = "Common options")]
+        #[arg(
+            long,
+            value_parser = config::parse_positive_timeout,
+            value_name = "seconds",
+            help_heading = "Common options"
+        )]
         timeout: Option<f64>,
         /// Parent skill root URI (e.g. viking://agent/skills); defaults to user-private skills
         #[arg(
@@ -413,6 +471,7 @@ enum Commands {
             short = 'n',
             alias = "limit",
             default_value = "256",
+            value_parser = clap::value_parser!(i32).range(0..),
             value_name = "n",
             help_heading = "Common options"
         )]
@@ -441,6 +500,7 @@ enum Commands {
             short = 'n',
             alias = "limit",
             default_value = "256",
+            value_parser = clap::value_parser!(i32).range(0..),
             value_name = "n",
             help_heading = "Common options"
         )]
@@ -477,7 +537,12 @@ enum Commands {
         #[arg(long, help_heading = "Common options")]
         wait: bool,
         /// Wait timeout in seconds (only used with --wait)
-        #[arg(long, value_name = "seconds", help_heading = "Common options")]
+        #[arg(
+            long,
+            value_parser = config::parse_positive_timeout,
+            value_name = "seconds",
+            help_heading = "Common options"
+        )]
         timeout: Option<f64>,
     },
     /// [Data] Move or rename resource
@@ -555,7 +620,12 @@ enum Commands {
         #[arg(long, default_value = "false", help_heading = "Common options")]
         wait: bool,
         /// Optional wait timeout in seconds
-        #[arg(long, value_name = "seconds", help_heading = "Common options")]
+        #[arg(
+            long,
+            value_parser = config::parse_positive_timeout,
+            value_name = "seconds",
+            help_heading = "Common options"
+        )]
         timeout: Option<f64>,
     },
     /// [Data] Update explicit retrieval tags metadata for a file or directory
@@ -609,6 +679,7 @@ enum Commands {
             long = "node-limit",
             alias = "limit",
             default_value = "10",
+            value_parser = clap::value_parser!(i32).range(0..),
             value_name = "n",
             help_heading = "Common options"
         )]
@@ -643,7 +714,7 @@ enum Commands {
             help_heading = "Common options"
         )]
         context_type: Option<Vec<String>>,
-        /// Only include results matching any of these explicit tags
+        /// Only include results matching all of these explicit tags
         #[arg(long = "tags", value_delimiter = ',')]
         tags: Option<Vec<String>>,
     },
@@ -677,6 +748,7 @@ enum Commands {
             long = "node-limit",
             alias = "limit",
             default_value = "10",
+            value_parser = clap::value_parser!(i32).range(0..),
             value_name = "n",
             help_heading = "Common options"
         )]
@@ -711,7 +783,7 @@ enum Commands {
             help_heading = "Advanced options"
         )]
         context_type: Option<Vec<String>>,
-        /// Only include results matching any of these explicit tags
+        /// Only include results matching all of these explicit tags
         #[arg(long = "tags", value_delimiter = ',')]
         tags: Option<Vec<String>>,
     },
@@ -746,6 +818,7 @@ enum Commands {
             long = "node-limit",
             alias = "limit",
             default_value = "256",
+            value_parser = clap::value_parser!(i32).range(0..),
             value_name = "n",
             help_heading = "Common options"
         )]
@@ -780,6 +853,7 @@ enum Commands {
             long = "node-limit",
             alias = "limit",
             default_value = "256",
+            value_parser = clap::value_parser!(i32).range(0..),
             value_name = "n",
             help_heading = "Common options"
         )]
@@ -941,12 +1015,48 @@ enum Commands {
         #[arg(long, help_heading = "Advanced options")]
         no_history: bool,
     },
+    /// [Interactive] Compile source materials with a VikingBot Skill
+    Compile {
+        /// Source directory; repeat the flag or separate directories with commas
+        #[arg(
+            long = "from",
+            required = true,
+            value_delimiter = ',',
+            value_name = "uri"
+        )]
+        from_uris: Vec<String>,
+        /// Target Wiki directory or skills namespace
+        #[arg(long, value_name = "uri")]
+        to: String,
+        /// Skill directory or SKILL.md Viking URI
+        #[arg(long, value_name = "uri")]
+        skill: String,
+        /// Description of this organization task
+        #[arg(long, value_name = "text")]
+        reason: Option<String>,
+        /// Wait for the Compile task to finish
+        #[arg(long)]
+        wait: bool,
+        /// Local wait timeout in seconds; does not cancel the task
+        #[arg(
+            long,
+            requires = "wait",
+            value_parser = config::parse_positive_timeout,
+            value_name = "seconds"
+        )]
+        timeout: Option<f64>,
+    },
 
     // --- Status & Observability ---
     /// [Status] Wait for queued async processing to complete
     Wait {
         /// Wait timeout in seconds
-        #[arg(long, value_name = "seconds", help_heading = "Common options")]
+        #[arg(
+            long,
+            value_parser = config::parse_positive_timeout,
+            value_name = "seconds",
+            help_heading = "Common options"
+        )]
         timeout: Option<f64>,
     },
     /// [Status] Track async resource processing tasks
@@ -954,7 +1064,7 @@ enum Commands {
         #[command(subcommand)]
         action: TaskCommands,
     },
-    /// [Version] Manage workspace snapshots (commit, restore, show, log)
+    /// [Version] Manage workspace snapshots (commit, restore, show, diff, log)
     Snapshot {
         #[command(subcommand)]
         cmd: SnapshotCmd,
@@ -1066,12 +1176,18 @@ enum TaskCommands {
         #[arg(value_name = "task-id")]
         task_id: String,
     },
+    /// Cancel a task
+    Cancel {
+        /// Task ID returned by add-resource/add-skill
+        #[arg(value_name = "task-id")]
+        task_id: String,
+    },
     /// List all tracked tasks
     List {
         /// Filter by task type (e.g. add_resource, add_skill, session_commit, reindex)
         #[arg(long, value_name = "type")]
         task_type: Option<String>,
-        /// Filter by status (pending, running, completed, failed)
+        /// Filter by status (pending, running, cancelling, completed, failed, cancelled)
         #[arg(long, value_name = "status")]
         status: Option<String>,
     },
@@ -1135,6 +1251,17 @@ pub(crate) enum SnapshotCmd {
         #[arg(long, value_delimiter = ',')]
         paths: Option<Vec<String>>,
     },
+    /// Compare one file between two snapshots
+    Diff {
+        /// viking:// URI of the file to compare
+        path: String,
+        /// Older commit oid, branch, or tag; omit to compare an empty file
+        #[arg(long = "from")]
+        from_ref: Option<String>,
+        /// Newer commit oid, branch, or tag
+        #[arg(long = "to")]
+        to_ref: String,
+    },
     /// Get the account .ovgitignore content
     IgnoreGet,
     /// Set the account .ovgitignore content
@@ -1155,7 +1282,7 @@ enum SystemCommands {
     /// Wait for queued async processing to complete
     Wait {
         /// Wait timeout in seconds
-        #[arg(long, value_name = "seconds")]
+        #[arg(long, value_parser = config::parse_positive_timeout, value_name = "seconds")]
         timeout: Option<f64>,
     },
     /// Show component status
@@ -1209,6 +1336,7 @@ enum ObserverCommands {
     /// Get retrieval quality metrics
     Retrieval,
     /// Get filesystem operation metrics
+    #[command(alias = "fs")]
     Filesystem,
     /// Get overall system status
     System,
@@ -1314,6 +1442,7 @@ enum SkillCommands {
             long = "node-limit",
             alias = "limit",
             default_value = "1000",
+            value_parser = clap::value_parser!(i32).range(0..),
             value_name = "n"
         )]
         node_limit: i32,
@@ -1332,6 +1461,7 @@ enum SkillCommands {
             long = "node-limit",
             alias = "limit",
             default_value = "10",
+            value_parser = clap::value_parser!(i32).range(0..),
             value_name = "n"
         )]
         node_limit: i32,
@@ -1678,6 +1808,10 @@ impl Commands {
                 action: SkillCommands::Validate { .. },
             } | Commands::Version
         )
+    }
+
+    fn allows_invalid_runtime_config(&self) -> bool {
+        matches!(self, Commands::Config { .. })
     }
 }
 
@@ -2166,7 +2300,7 @@ fn command_tokens_for_config_gate(args: &[OsString]) -> Vec<String> {
 
 fn known_task_command_requires_config(tokens: &[String]) -> bool {
     match tokens.get(1).map(String::as_str) {
-        Some("status" | "list") => true,
+        Some("status" | "cancel" | "list") => true,
         Some("watch") => match tokens.get(2).map(String::as_str) {
             None => true,
             Some(token) => is_watch_subcommand(token),
@@ -2402,6 +2536,22 @@ fn preprocess_cli_args(args: Vec<OsString>) -> Vec<OsString> {
     preprocess_privacy_args(args)
 }
 
+fn pre_parse_output_options(args: &[OsString]) -> (OutputFormat, bool) {
+    let Ok(matches) = Cli::command()
+        .ignore_errors(true)
+        .try_get_matches_from(args)
+    else {
+        return (OutputFormat::Table, true);
+    };
+    (
+        matches
+            .get_one::<OutputFormat>("output")
+            .copied()
+            .unwrap_or(OutputFormat::Table),
+        matches.get_one::<bool>("compact").copied().unwrap_or(true),
+    )
+}
+
 fn preprocess_privacy_args(args: Vec<OsString>) -> Vec<OsString> {
     let args = preprocess_privacy_get_shortcut(args);
     preprocess_privacy_upsert_key_flags(args)
@@ -2526,16 +2676,50 @@ fn language_command_can_run_picker(has_language_value: bool, is_interactive: boo
     has_language_value || is_interactive
 }
 
+fn resolve_output_format(cli_output: Option<OutputFormat>, config: &Config) -> OutputFormat {
+    cli_output.unwrap_or_else(|| OutputFormat::from(config.output.as_str()))
+}
+
+fn render_pre_language_help_request(args: &[OsString]) -> Option<String> {
+    if !args
+        .iter()
+        .skip(1)
+        .any(|arg| matches!(arg.to_str(), Some("-h" | "--help")))
+    {
+        return None;
+    }
+
+    let error = Cli::try_parse_from(args).err()?;
+    if error.kind() != clap::error::ErrorKind::DisplayHelp {
+        return None;
+    }
+
+    if help_ui::is_top_level_help_request(args) {
+        return Some(help_ui::render_top_level_help());
+    }
+    help_ui::render_command_help_request(args).or_else(|| Some(error.to_string()))
+}
+
 #[tokio::main]
 async fn main() {
     let args = preprocess_cli_args(std::env::args_os().collect());
     let command_display = error_ui::display_command(&args);
+    let (pre_parse_output_format, pre_parse_compact) = pre_parse_output_options(&args);
+    if let Some(help) = render_pre_language_help_request(&args) {
+        print!("{help}");
+        return;
+    }
     match ensure_language_selected_before_command(&args).await {
         Ok(true) => {}
         Ok(false) => return,
         Err(e) => {
-            let report = error_ui::report_for_runtime_error(&command_display, &e);
-            error_ui::print_report(&report, false);
+            error_ui::print_runtime_error(
+                &command_display,
+                &e,
+                pre_parse_output_format,
+                pre_parse_compact,
+                false,
+            );
             std::process::exit(2);
         }
     }
@@ -2558,8 +2742,13 @@ async fn main() {
         match Config::load_required() {
             Ok(config) => Some(config),
             Err(e) => {
-                let report = error_ui::report_for_runtime_error(&command_display, &e);
-                error_ui::print_report(&report, false);
+                error_ui::print_runtime_error(
+                    &command_display,
+                    &e,
+                    pre_parse_output_format,
+                    pre_parse_compact,
+                    false,
+                );
                 std::process::exit(2);
             }
         }
@@ -2580,7 +2769,7 @@ async fn main() {
         }
     };
 
-    let output_format = cli.output;
+    let output_override = cli.output;
     let compact = cli.compact;
     let legacy_upload_options = UploadCliOptions {
         progress: cli.progress,
@@ -2640,8 +2829,13 @@ async fn main() {
             std::process::exit(2);
         }
         if let Err(e) = handlers::handle_language(language.clone()).await {
-            let report = error_ui::report_for_runtime_error(&command_display, &e);
-            error_ui::print_report(&report, cli.verbose);
+            error_ui::print_runtime_error(
+                &command_display,
+                &e,
+                pre_parse_output_format,
+                compact,
+                cli.verbose,
+            );
             std::process::exit(2);
         }
         return;
@@ -2658,11 +2852,23 @@ async fn main() {
     let config = match config_result {
         Ok(config) => config,
         Err(e) => {
-            let report = error_ui::report_for_runtime_error(&command_display, &e);
-            error_ui::print_report(&report, cli.verbose);
+            error_ui::print_runtime_error(
+                &command_display,
+                &e,
+                pre_parse_output_format,
+                compact,
+                cli.verbose,
+            );
             std::process::exit(2);
         }
     };
+    let output_format = resolve_output_format(output_override, &config);
+    if !cli.command.allows_invalid_runtime_config()
+        && let Err(e) = config.validate_runtime_values()
+    {
+        error_ui::print_runtime_error(&command_display, &e, output_format, compact, cli.verbose);
+        std::process::exit(2);
+    }
     let ctx = CliContext::from_config(
         config,
         output_format,
@@ -2706,6 +2912,8 @@ async fn main() {
     let result = match cli.command {
         Commands::AddResource {
             path,
+            add_type,
+            manifest,
             to,
             parent,
             parent_auto_create,
@@ -2719,30 +2927,66 @@ async fn main() {
             exclude,
             no_directly_upload_media,
             watch_interval,
+            processing_mode,
             resource_args,
+            tags,
+            tag_mode,
             upload_options,
         } => {
             let ctx =
                 ctx.with_upload_options(upload_options.merged_with_legacy(legacy_upload_options));
-            handlers::handle_add_resource(
-                path,
-                to,
-                parent,
-                parent_auto_create,
-                reason,
-                instruction,
-                wait,
-                timeout,
-                strict_mode,
-                ignore_dirs,
-                include,
-                exclude,
-                no_directly_upload_media,
-                watch_interval,
-                resource_args,
-                ctx,
-            )
-            .await
+            if let Some(manifest) = manifest {
+                match handlers::parse_add_resource_args(resource_args.as_deref())
+                    .and_then(|args| openviking_assets::parse_manifest_run_args(args.as_ref()))
+                {
+                    Err(e) => Err(e),
+                    Ok(run) => {
+                        openviking_assets::handle_manifest_apply(
+                            manifest,
+                            run.catalog,
+                            openviking_assets::ManifestRunOptions {
+                                dry_run: run.dry_run,
+                                skip_failed: run.skip_failed,
+                                wait,
+                                watch_interval,
+                                processing_mode,
+                                external_connector: run.external_connector,
+                            },
+                            timeout,
+                            ctx,
+                        )
+                        .await
+                    }
+                }
+            } else if let Some(path) = path {
+                handlers::handle_add_resource(
+                    path,
+                    add_type,
+                    to,
+                    parent,
+                    parent_auto_create,
+                    reason,
+                    instruction,
+                    wait,
+                    timeout,
+                    strict_mode,
+                    ignore_dirs,
+                    include,
+                    exclude,
+                    no_directly_upload_media,
+                    watch_interval.unwrap_or(0.0),
+                    processing_mode,
+                    resource_args,
+                    tags,
+                    tag_mode,
+                    ctx,
+                )
+                .await
+            } else {
+                Err(error::Error::Client(
+                    "a path/URL or --manifest is required".to_string(),
+                ))
+            }
         }
         Commands::AddSkill {
             data,
@@ -2918,6 +3162,10 @@ async fn main() {
                 let client = ctx.get_client();
                 commands::task::status(&client, &task_id, ctx.output_format, ctx.compact).await
             }
+            TaskCommands::Cancel { task_id } => {
+                let client = ctx.get_client();
+                commands::task::cancel(&client, &task_id, ctx.output_format, ctx.compact).await
+            }
             TaskCommands::List { task_type, status } => {
                 let client = ctx.get_client();
                 commands::task::list(
@@ -3061,6 +3309,28 @@ async fn main() {
                 no_history,
             };
             cmd.run().await
+        }
+        Commands::Compile {
+            from_uris,
+            to,
+            skill,
+            reason,
+            wait,
+            timeout,
+        } => {
+            let client = ctx.get_client();
+            commands::compile::run(
+                &client,
+                from_uris,
+                to,
+                skill,
+                reason,
+                wait,
+                timeout,
+                ctx.output_format,
+                ctx.compact,
+            )
+            .await
         }
         Commands::Config { action } => handlers::handle_config(action, ctx).await,
         Commands::Language { .. } => unreachable!("language command is handled before config load"),
@@ -3209,8 +3479,13 @@ async fn main() {
 
     if let Err(e) = result {
         if !matches!(e, Error::AlreadyReported) {
-            let report = error_ui::report_for_runtime_error(&command_display, &e);
-            error_ui::print_report(&report, verbose_errors);
+            error_ui::print_runtime_error(
+                &command_display,
+                &e,
+                output_format,
+                compact,
+                verbose_errors,
+            );
         }
         std::process::exit(1);
     }
@@ -3220,10 +3495,12 @@ async fn main() {
 mod tests {
     use super::{
         Cli, CliContext, Commands, ConfigAddTarget, ConfigCommands, LanguageGateAction,
-        PrivacyCommands, SkillCommands, UploadCliOptions, find_command_index, first_command_token,
-        is_language_command_request, language_command_can_run_picker, language_gate_action,
-        language_required_message, legacy_upload_option_error, plain_help_misuse,
+        ObserverCommands, PrivacyCommands, SkillCommands, SnapshotCmd, UploadCliOptions,
+        find_command_index, first_command_token, is_language_command_request,
+        language_command_can_run_picker, language_gate_action, language_required_message,
+        legacy_upload_option_error, plain_help_misuse, pre_parse_output_options,
         pre_parse_requires_cli_config_file, preprocess_cli_args, preprocess_privacy_args,
+        render_pre_language_help_request, resolve_output_format,
     };
     use crate::config::{Config, DEFAULT_CUSTOM_URL};
     use crate::output::OutputFormat;
@@ -3252,6 +3529,48 @@ mod tests {
         assert_eq!(cli.account.as_deref(), Some("acme"));
         assert_eq!(cli.user.as_deref(), Some("alice"));
         assert_eq!(cli.actor_peer_id.as_deref(), Some("peer-a"));
+    }
+
+    #[test]
+    fn cli_parses_snapshot_diff_refs() {
+        let cli = Cli::try_parse_from([
+            "ov",
+            "snapshot",
+            "diff",
+            "viking://resources/a.md",
+            "--from",
+            "old",
+            "--to",
+            "new",
+        ])
+        .expect("snapshot diff should parse");
+
+        match cli.command {
+            Commands::Snapshot {
+                cmd:
+                    SnapshotCmd::Diff {
+                        path,
+                        from_ref,
+                        to_ref,
+                    },
+            } => {
+                assert_eq!(path, "viking://resources/a.md");
+                assert_eq!(from_ref.as_deref(), Some("old"));
+                assert_eq!(to_ref, "new");
+            }
+            _ => panic!("expected snapshot diff"),
+        }
+    }
+
+    #[test]
+    fn pre_parse_output_options_preserve_json_config_errors() {
+        for args in [
+            os_args(&["ov", "ls", "--output", "json", "--compact=false"]),
+            os_args(&["ov", "ls", "-ojson"]),
+            os_args(&["ov", "ls", "-o=json"]),
+        ] {
+            assert_eq!(pre_parse_output_options(&args).0, OutputFormat::Json);
+        }
     }
 
     #[test]
@@ -3368,6 +3687,70 @@ mod tests {
             }
             _ => panic!("expected chat command"),
         }
+    }
+
+    #[test]
+    fn cli_compile_requires_skill_and_expands_source_flags() {
+        let cli = Cli::try_parse_from([
+            "ov",
+            "compile",
+            "--from",
+            "viking://resources/a,viking://resources/b",
+            "--from",
+            "viking://resources/c",
+            "--to",
+            "viking://resources/wiki",
+            "--skill",
+            "viking://agent/skills/wiki",
+            "--wait",
+            "--timeout",
+            "10",
+        ])
+        .expect("compile flags should parse");
+        match cli.command {
+            Commands::Compile {
+                from_uris,
+                skill,
+                reason,
+                wait,
+                timeout,
+                ..
+            } => {
+                assert_eq!(from_uris.len(), 3);
+                assert_eq!(skill, "viking://agent/skills/wiki");
+                assert!(reason.is_none());
+                assert!(wait);
+                assert_eq!(timeout, Some(10.0));
+            }
+            _ => panic!("expected compile command"),
+        }
+
+        assert!(
+            Cli::try_parse_from([
+                "ov",
+                "compile",
+                "--from",
+                "viking://resources/a",
+                "--to",
+                "viking://resources/wiki",
+            ])
+            .is_err()
+        );
+        assert!(
+            Cli::try_parse_from([
+                "ov",
+                "compile",
+                "--from",
+                "viking://resources/a",
+                "--to",
+                "viking://resources/wiki",
+                "--skill",
+                "viking://agent/skills/wiki",
+                "--timeout",
+                "10",
+            ])
+            .is_err()
+        );
     }
 
     #[test]
@@ -3530,6 +3913,7 @@ mod tests {
         for args in [
             &["ov", "find"][..],
             &["ov", "task", "status"],
+            &["ov", "task", "cancel"],
             &["ov", "task", "watch", "show"],
             &["ov", "config", "validate"],
             &["ov", "config", "show"],
@@ -3592,6 +3976,7 @@ mod tests {
             &["ov", "config", "show"],
             &["ov", "config", "validate"],
             &["ov", "task", "status"],
+            &["ov", "task", "cancel"],
             &["ov", "task", "list"],
             &["ov", "task", "watch"],
             &["ov", "task", "watch", "ls"],
@@ -3736,6 +4121,17 @@ mod tests {
     }
 
     #[test]
+    fn cli_add_resource_help_shows_tag_flags() {
+        let err = Cli::command()
+            .try_get_matches_from(["ov", "add-resource", "--help"])
+            .expect_err("help should exit through clap error");
+        let help = err.to_string();
+
+        assert!(help.contains("--tag"));
+        assert!(help.contains("--tag-mode"));
+    }
+
+    #[test]
     fn cli_add_skill_help_shows_upload_flags() {
         let err = Cli::command()
             .try_get_matches_from(["ov", "add-skill", "--help"])
@@ -3791,6 +4187,85 @@ mod tests {
 
         assert!(Cli::try_parse_from(["ov", "skills", "add", "./skill", "--progress"]).is_err());
         assert!(Cli::try_parse_from(["ov", "skills", "update", "--progress"]).is_err());
+    }
+
+    #[test]
+    fn cli_add_resource_add_type_requires_exact_to() {
+        assert!(
+            Cli::try_parse_from(["ov", "add-resource", "space:home", "--add-type", "feishu"])
+                .is_err()
+        );
+        assert!(
+            Cli::try_parse_from([
+                "ov",
+                "add-resource",
+                "space:home",
+                "--add-type",
+                "feishu",
+                "--to",
+                "viking://resources/feishu",
+                "--parent",
+                "viking://resources/imports",
+            ])
+            .is_err()
+        );
+        assert!(
+            Cli::try_parse_from([
+                "ov",
+                "add-resource",
+                "space:home",
+                "--add-type",
+                "feishu",
+                "--to",
+                "viking://resources/feishu",
+                "--parent-auto-create",
+                "viking://resources/imports",
+            ])
+            .is_err()
+        );
+
+        let cli = Cli::try_parse_from([
+            "ov",
+            "add-resource",
+            "space:home",
+            "--add-type",
+            "feishu",
+            "--to",
+            "viking://resources/feishu",
+        ])
+        .expect("declared add type with an exact target should parse");
+
+        match cli.command {
+            Commands::AddResource { add_type, to, .. } => {
+                assert_eq!(add_type.as_deref(), Some("feishu"));
+                assert_eq!(to.as_deref(), Some("viking://resources/feishu"));
+            }
+            _ => panic!("expected add-resource command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_add_resource_tags() {
+        let cli = Cli::try_parse_from([
+            "ov",
+            "add-resource",
+            "./README.md",
+            "--tag",
+            "team=search",
+            "--tag",
+            "env=test",
+            "--tag-mode",
+            "append",
+        ])
+        .expect("add-resource tag flags should parse");
+
+        match cli.command {
+            Commands::AddResource { tags, tag_mode, .. } => {
+                assert_eq!(tags, vec!["team=search", "env=test"]);
+                assert_eq!(tag_mode, "append");
+            }
+            _ => panic!("expected add-resource command"),
+        }
     }
 
     #[test]
@@ -3915,7 +4390,7 @@ mod tests {
         let show_global_output =
             Cli::try_parse_from(["ov", "skills", "show", "code-review", "-o", "json"])
                 .expect("skills show should accept global -o after the subcommand");
-        assert_eq!(show_global_output.output, OutputFormat::Json);
+        assert_eq!(show_global_output.output, Some(OutputFormat::Json));
 
         let remove = Cli::try_parse_from(["ov", "skills", "remove", "foo", "bar", "--yes"])
             .expect("skills remove --yes should parse");
@@ -4065,6 +4540,154 @@ mod tests {
         match cli.command {
             Commands::Language { language } => assert!(language.is_none()),
             _ => panic!("expected language command"),
+        }
+    }
+
+    #[test]
+    fn all_timeout_options_require_positive_finite_seconds() {
+        let command_prefixes = [
+            vec!["ov", "add-resource", "https://example.com", "--timeout"],
+            vec!["ov", "add-skill", "skill", "--timeout"],
+            vec!["ov", "rm", "viking://resources/item", "--timeout"],
+            vec![
+                "ov",
+                "write",
+                "viking://resources/item",
+                "--content",
+                "value",
+                "--timeout",
+            ],
+            vec![
+                "ov",
+                "compile",
+                "--from",
+                "viking://resources/source",
+                "--to",
+                "viking://resources/target",
+                "--skill",
+                "viking://user/skills/compiler",
+                "--wait",
+                "--timeout",
+            ],
+            vec!["ov", "wait", "--timeout"],
+            vec!["ov", "system", "wait", "--timeout"],
+        ];
+
+        for prefix in command_prefixes {
+            for invalid in ["0", "-1", "inf", "NaN", "1e300"] {
+                let mut args = prefix.clone();
+                args.push(invalid);
+                assert!(
+                    Cli::try_parse_from(&args).is_err(),
+                    "{args:?} should reject an invalid timeout"
+                );
+            }
+
+            let mut args = prefix;
+            args.push("0.1");
+            assert!(
+                Cli::try_parse_from(&args).is_ok(),
+                "{args:?} should accept a positive finite timeout"
+            );
+        }
+    }
+
+    #[test]
+    fn all_node_limit_options_accept_zero_and_reject_negative_values() {
+        let command_prefixes = [
+            vec!["ov", "ls", "--node-limit"],
+            vec!["ov", "tree", "viking://resources", "--node-limit"],
+            vec!["ov", "find", "query", "--node-limit"],
+            vec!["ov", "search", "query", "--node-limit"],
+            vec!["ov", "grep", "query", "--node-limit"],
+            vec!["ov", "glob", "**/*", "--node-limit"],
+            vec!["ov", "skills", "list", "--node-limit"],
+            vec!["ov", "skills", "find", "query", "--node-limit"],
+        ];
+
+        for prefix in command_prefixes {
+            let mut negative_args = prefix.clone();
+            negative_args.push("-1");
+            assert!(
+                Cli::try_parse_from(&negative_args).is_err(),
+                "{negative_args:?} should reject a negative node limit"
+            );
+
+            let mut zero_args = prefix.clone();
+            zero_args.push("0");
+            assert!(
+                Cli::try_parse_from(&zero_args).is_ok(),
+                "{zero_args:?} should preserve the established zero-limit semantics"
+            );
+
+            let mut args = prefix;
+            args.push("1");
+            assert!(
+                Cli::try_parse_from(&args).is_ok(),
+                "{args:?} should accept a positive node limit"
+            );
+        }
+    }
+
+    #[test]
+    fn config_commands_can_load_invalid_runtime_values_for_repair() {
+        let cli = Cli::try_parse_from(["ov", "config", "show"]).expect("config show should parse");
+        assert!(cli.command.allows_invalid_runtime_config());
+
+        let status = Cli::try_parse_from(["ov", "status"]).expect("status should parse");
+        assert!(!status.command.allows_invalid_runtime_config());
+    }
+
+    #[test]
+    fn configured_output_is_used_unless_cli_overrides_it() {
+        let config = Config {
+            output: "json".to_string(),
+            ..Config::default()
+        };
+
+        assert_eq!(resolve_output_format(None, &config), OutputFormat::Json);
+        assert_eq!(
+            resolve_output_format(Some(OutputFormat::Table), &config),
+            OutputFormat::Table
+        );
+        let cli = Cli::try_parse_from(["ov", "status"]).unwrap();
+        assert_eq!(cli.output, None);
+
+        let invalid_config = Config {
+            output: "yaml".to_string(),
+            ..Config::default()
+        };
+        assert_eq!(
+            resolve_output_format(None, &invalid_config),
+            OutputFormat::Table,
+            "repair commands need a safe fallback for invalid persisted output"
+        );
+    }
+
+    #[test]
+    fn only_explicit_clap_help_bypasses_language_setup() {
+        for args in [
+            ["ov", "--help"].as_slice(),
+            ["ov", "-h"].as_slice(),
+            ["ov", "status", "--help"].as_slice(),
+            ["ov", "system", "wait", "-h"].as_slice(),
+        ] {
+            assert!(
+                render_pre_language_help_request(&os_args(args)).is_some(),
+                "{args:?} should render before language setup"
+            );
+        }
+
+        for args in [
+            ["ov", "status"].as_slice(),
+            ["ov", "task"].as_slice(),
+            ["ov", "-help"].as_slice(),
+            ["ov", "--account", "--help", "status"].as_slice(),
+        ] {
+            assert!(
+                render_pre_language_help_request(&os_args(args)).is_none(),
+                "{args:?} should keep the language gate"
+            );
         }
     }
 
@@ -4453,6 +5076,36 @@ mod tests {
     }
 
     #[test]
+    fn observer_alias_and_snapshot_restore_examples_parse() {
+        let observer = Cli::try_parse_from(["ov", "observer", "fs"]).unwrap();
+        assert!(matches!(
+            observer.command,
+            Commands::Observer {
+                action: ObserverCommands::Filesystem
+            }
+        ));
+
+        let snapshot = Cli::try_parse_from([
+            "ov",
+            "snapshot",
+            "restore",
+            "abc123",
+            "viking://projects/acme",
+        ])
+        .unwrap();
+        assert!(matches!(
+            snapshot.command,
+            Commands::Snapshot {
+                cmd: SnapshotCmd::Restore {
+                    source_commit,
+                    project_dir,
+                    ..
+                }
+            } if source_commit == "abc123" && project_dir.as_deref() == Some("viking://projects/acme")
+        ));
+    }
+
+    #[test]
     fn cli_write_rejects_removed_semantic_flags() {
         let result = Cli::try_parse_from([
             "ov",
@@ -4497,6 +5150,57 @@ mod tests {
             result.is_err(),
             "removed import force flag should not parse"
         );
+    }
+
+    #[test]
+    fn cli_manifest_mode_takes_run_options_via_args() {
+        let result = Cli::try_parse_from([
+            "ov",
+            "add-resource",
+            "--manifest",
+            "manifests/code-qa.yaml",
+            "--args",
+            "catalog:catalog.yaml,dry_run:true,skip_failed:true",
+        ]);
+
+        assert!(result.is_ok(), "manifest mode with --args should parse");
+    }
+
+    #[test]
+    fn cli_manifest_mode_dropped_dedicated_run_flags() {
+        for flag in [
+            "--catalog=catalog.yaml",
+            "--dry-run",
+            "--skip-failed",
+            "--external-connector",
+        ] {
+            let result =
+                Cli::try_parse_from(["ov", "add-resource", "--manifest", "code-qa.yaml", flag]);
+            assert!(
+                result.is_err(),
+                "removed manifest flag {flag} should not parse"
+            );
+        }
+    }
+
+    #[test]
+    fn cli_manifest_mode_rejects_silently_ignored_single_resource_options() {
+        for args in [
+            ["--reason", "why"],
+            ["--instruction", "how"],
+            ["--no-directly-upload-media", "--wait"],
+        ] {
+            let result = Cli::try_parse_from(
+                ["ov", "add-resource", "--manifest", "code-qa.yaml"]
+                    .into_iter()
+                    .chain(args),
+            );
+            assert!(
+                result.is_err(),
+                "{} must conflict with --manifest instead of being ignored",
+                args[0]
+            );
+        }
     }
 
     #[test]

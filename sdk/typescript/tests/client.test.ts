@@ -64,7 +64,9 @@ describe("OpenVikingClient", () => {
   });
 
   it("sends dry_run for prune_orphans reindex requests", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(ok({ status: "completed" }));
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(ok({ status: "completed" }));
     const client = new OpenVikingClient({
       baseUrl: "https://example.com",
       fetch: fetcher,
@@ -83,6 +85,29 @@ describe("OpenVikingClient", () => {
       mode: "prune_orphans",
       wait: true,
       dry_run: true,
+    });
+  });
+
+  it("sends processing_mode for addResource requests", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(ok({}));
+    const client = new OpenVikingClient({
+      baseUrl: "https://example.com",
+      fetch: fetcher,
+    });
+
+    await client.addResource("https://example.com/guide.md", {
+      to: "viking://resources/guide",
+      processingMode: "vectors_only",
+      wait: true,
+    });
+
+    const [url, init] = fetcher.mock.calls[0]!;
+    expect(String(url)).toBe("https://example.com/api/v1/resources");
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      path: "https://example.com/guide.md",
+      to: "viking://resources/guide",
+      processing_mode: "vectors_only",
+      wait: true,
     });
   });
 
@@ -139,6 +164,27 @@ describe("OpenVikingClient", () => {
     expect(url.searchParams.get("node_limit")).toBe("200");
     expect(url.searchParams.get("sort_by")).toBe("mtime");
     expect(url.searchParams.get("sort_order")).toBe("desc");
+  });
+
+  it("sends addResource tags and tagMode to the server", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(ok({ root_uri: "viking://resources/demo" }));
+    const client = new OpenVikingClient({
+      baseUrl: "https://example.com",
+      fetch: fetcher,
+    });
+
+    await client.addResource("https://example.com/demo.md", {
+      tags: ["team=search"],
+      tagMode: "append",
+    });
+
+    expect(JSON.parse(String(fetcher.mock.calls[0]![1]?.body))).toMatchObject({
+      path: "https://example.com/demo.md",
+      tags: ["team=search"],
+      tag_mode: "append",
+    });
   });
 
   it("converts an existing Node.js image path to a data URI", async () => {
@@ -484,7 +530,62 @@ describe("OpenVikingClient", () => {
 
     await expect(
       client.backupOVPack("backup", false, { signal: controller.signal }),
-    ).rejects.toMatchObject({ code: "DEADLINE_EXCEEDED" });
+    ).rejects.toMatchObject({
+      code: "ABORTED",
+      message: "Request was aborted by the caller",
+    });
+  });
+
+  it("maps OpenVikingError abort reasons to caller cancellation", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async (_input, init) => {
+        if (init?.signal?.aborted) throw init.signal.reason;
+        return new Response(new Uint8Array([1]));
+      });
+    const client = new OpenVikingClient({
+      baseUrl: "https://example.com",
+      fetch: fetcher,
+    });
+    const controller = new AbortController();
+    controller.abort(new OpenVikingError("cancelled", { code: "UNAVAILABLE" }));
+
+    await expect(
+      client.backupOVPack("backup", false, { signal: controller.signal }),
+    ).rejects.toMatchObject({
+      code: "ABORTED",
+      message: "Request was aborted by the caller",
+    });
+  });
+
+  it("keeps in-flight caller cancellation distinct from timeouts", async () => {
+    let markStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(
+      async (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          markStarted?.();
+          init?.signal?.addEventListener("abort", () =>
+            reject(init.signal?.reason),
+          );
+        }),
+    );
+    const client = new OpenVikingClient({
+      baseUrl: "https://example.com",
+      fetch: fetcher,
+      timeout: 10_000,
+    });
+    const controller = new AbortController();
+
+    const request = client.backupOVPack("backup", false, {
+      signal: controller.signal,
+    });
+    await started;
+    controller.abort(new Error("cancelled"));
+
+    await expect(request).rejects.toMatchObject({ code: "ABORTED" });
   });
 
   it("rejects directories before importing or restoring OVPack files", async () => {
@@ -540,7 +641,7 @@ describe("OpenVikingClient", () => {
     });
   });
 
-  it("supports snapshot restore, binary show, log and ignore operations", async () => {
+  it("supports snapshot restore, binary show, log, diff and ignore operations", async () => {
     const fetcher = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(ok({ oid: "restored" }))
@@ -555,6 +656,15 @@ describe("OpenVikingClient", () => {
       )
       .mockResolvedValueOnce(ok([{ oid: "commit-1" }]))
       .mockResolvedValueOnce(ok([{ oid: "commit-1" }]))
+      .mockResolvedValueOnce(
+        ok({
+          path: "viking://resources/a",
+          from_commit: "old",
+          to_commit: "new",
+          change_type: "modified",
+          diff_text: "@@ -1 +1 @@\n-old\n+new\n",
+        }),
+      )
       .mockResolvedValueOnce(ok("*.tmp\n"))
       .mockResolvedValueOnce(ok(null))
       .mockResolvedValueOnce(ok(null));
@@ -580,6 +690,9 @@ describe("OpenVikingClient", () => {
     await expect(client.gitLog("main", 20, [])).resolves.toEqual([
       { oid: "commit-1" },
     ]);
+    await expect(
+      client.gitDiff("viking://resources/a", "new", "old"),
+    ).resolves.toMatchObject({ change_type: "modified" });
     await expect(client.gitGetIgnore()).resolves.toBe("*.tmp\n");
     await client.gitSetIgnore("*.log\n");
     await client.gitDeleteIgnore();
@@ -601,7 +714,12 @@ describe("OpenVikingClient", () => {
     const unfilteredLogUrl = new URL(String(fetcher.mock.calls[3]![0]));
     expect(unfilteredLogUrl.searchParams.get("limit")).toBe("20");
     expect(unfilteredLogUrl.searchParams.getAll("paths")).toEqual([]);
-    expect(JSON.parse(String(fetcher.mock.calls[5]![1]?.body))).toEqual({
+    const diffUrl = new URL(String(fetcher.mock.calls[4]![0]));
+    expect(diffUrl.pathname).toBe("/api/v1/snapshot/diff");
+    expect(diffUrl.searchParams.get("path")).toBe("viking://resources/a");
+    expect(diffUrl.searchParams.get("from")).toBe("old");
+    expect(diffUrl.searchParams.get("to")).toBe("new");
+    expect(JSON.parse(String(fetcher.mock.calls[6]![1]?.body))).toEqual({
       content: "*.log\n",
     });
   });

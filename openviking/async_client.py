@@ -24,7 +24,6 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-
 if TYPE_CHECKING:
     from openviking.snapshot_namespace import AsyncSnapshotNamespace
 
@@ -110,11 +109,6 @@ class AsyncOpenViking:
                 await cls._instance.close()
                 cls._instance = None
 
-        # Also reset lock manager singleton
-        from openviking.storage.transaction import reset_lock_manager
-
-        reset_lock_manager()
-
     # ============= Session methods =============
 
     def session(self, session_id: Optional[str] = None, must_exist: bool = False) -> Session:
@@ -196,6 +190,9 @@ class AsyncOpenViking:
         created_at: str | None = None,
         peer_id: str | None = None,
         telemetry: TelemetryRequest = False,
+        turn_id: str | None = None,
+        message_kind: str | None = None,
+        source_message_ids: list[str] | None = None,
     ) -> Dict[str, Any]:
         """Add a message to a session.
 
@@ -210,6 +207,15 @@ class AsyncOpenViking:
         If both content and parts are provided, parts takes precedence.
         """
         await self._ensure_initialized()
+        semantic_kwargs = {
+            key: value
+            for key, value in {
+                "turn_id": turn_id,
+                "message_kind": message_kind,
+                "source_message_ids": source_message_ids,
+            }.items()
+            if value is not None
+        }
         return await self._client.add_message(
             session_id=session_id,
             role=role,
@@ -218,6 +224,7 @@ class AsyncOpenViking:
             created_at=created_at,
             peer_id=peer_id,
             telemetry=telemetry,
+            **semantic_kwargs,
         )
 
     async def batch_add_messages(
@@ -240,19 +247,39 @@ class AsyncOpenViking:
         telemetry: TelemetryRequest = False,
         *,
         keep_recent_count: int = 0,
+        retention_mode: str | None = None,
+        keep_recent_turn_count: int | None = None,
+        retained_message_token_budget: int | None = None,
+        min_raw_tail_steps: int | None = None,
     ) -> Dict[str, Any]:
         """Commit a session (archive and extract memories)."""
         await self._ensure_initialized()
+        optional_retention = {
+            key: value
+            for key, value in {
+                "retention_mode": retention_mode,
+                "keep_recent_turn_count": keep_recent_turn_count,
+                "retained_message_token_budget": retained_message_token_budget,
+                "min_raw_tail_steps": min_raw_tail_steps,
+            }.items()
+            if value is not None
+        }
         return await self._client.commit_session(
             session_id,
             telemetry=telemetry,
             keep_recent_count=keep_recent_count,
+            **optional_retention,
         )
 
     async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Query background task status."""
         await self._ensure_initialized()
         return await self._client.get_task(task_id)
+
+    async def cancel_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Cancel a background task."""
+        await self._ensure_initialized()
+        return await self._client.cancel_task(task_id)
 
     async def list_tasks(
         self,
@@ -302,6 +329,10 @@ class AsyncOpenViking:
         watch_interval: float = 0,
         args: Optional[Dict[str, Any]] = None,
         telemetry: TelemetryRequest = False,
+        processing_mode: str = "semantic_and_vectors",
+        add_type: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        tag_mode: str = "replace",
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -311,6 +342,9 @@ class AsyncOpenViking:
             path: Local file path or URL. A sitemap / RSS / Atom URL ingests the
                 whole site as one resource tree; pass ``args={"site": True}`` to
                 force whole-site ingestion from a bare domain.
+            add_type: Explicit Connector source type. Requires an exact ``to``
+                target and cannot be combined with ``parent``. The source
+                ``path`` is forwarded verbatim.
             reason: Context/reason for adding this resource.
             instruction: Specific instruction for processing.
             wait: If True, wait for processing to complete.
@@ -318,6 +352,8 @@ class AsyncOpenViking:
             parent: Target parent URI (must already exist).
             build_index: Whether to build vector index immediately (default: True).
             summarize: Whether to generate summary (default: False).
+            processing_mode: "semantic_and_vectors" for normal semantic processing,
+                or "vectors_only" to only build vector indexes.
             watch_interval: Auto-refresh interval in minutes (>0 enables a watch).
                 On a sitemap/feed URL this keeps the whole site refreshed.
             args: Parser/accessor-specific options (e.g. ``site``, ``max_pages``).
@@ -325,11 +361,18 @@ class AsyncOpenViking:
         """
         await self._ensure_initialized()
 
+        if add_type is not None:
+            add_type = add_type.strip() or None
+        if add_type and parent:
+            raise ValueError("'add_type' cannot be combined with 'parent'.")
+        if add_type and not to:
+            raise ValueError("'add_type' requires an exact 'to' target.")
         if to and parent:
             raise ValueError("Cannot specify both 'to' and 'parent' at the same time.")
 
         return await self._client.add_resource(
             path=path,
+            add_type=add_type,
             to=to,
             parent=parent,
             reason=reason,
@@ -338,9 +381,12 @@ class AsyncOpenViking:
             timeout=timeout,
             build_index=build_index,
             summarize=summarize,
+            processing_mode=processing_mode,
             telemetry=telemetry,
             watch_interval=watch_interval,
             args=args,
+            tags=tags,
+            tag_mode=tag_mode,
             **kwargs,
         )
 
@@ -683,7 +729,7 @@ class AsyncOpenViking:
         simple = kwargs.get("simple", False)
         output = kwargs.get("output", "original")
         abs_limit = kwargs.get("abs_limit", 256)
-        show_all_hidden = kwargs.get("show_all_hidden", True)
+        show_all_hidden = kwargs.get("show_all_hidden", False)
         node_limit = kwargs.get("node_limit", 1000)
         sort_by = kwargs.get("sort_by")
         sort_order = kwargs.get("sort_order", "asc")
@@ -745,7 +791,7 @@ class AsyncOpenViking:
         await self._ensure_initialized()
         output = kwargs.get("output", "original")
         abs_limit = kwargs.get("abs_limit", 128)
-        show_all_hidden = kwargs.get("show_all_hidden", True)
+        show_all_hidden = kwargs.get("show_all_hidden", False)
         node_limit = kwargs.get("node_limit", 1000)
         return await self._client.tree(
             uri,

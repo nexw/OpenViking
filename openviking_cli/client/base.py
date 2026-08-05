@@ -43,10 +43,18 @@ class BaseClient(ABC):
         wait: bool = False,
         timeout: Optional[float] = None,
         watch_interval: float = 0,
+        processing_mode: str = "semantic_and_vectors",
         args: Optional[Dict[str, Any]] = None,
         telemetry: TelemetryRequest = False,
+        add_type: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        tag_mode: str = "replace",
     ) -> Dict[str, Any]:
-        """Add resource to OpenViking."""
+        """Add resource to OpenViking.
+
+        ``add_type`` declares a Connector source and requires an exact ``to``
+        target; it cannot be combined with ``parent``.
+        """
         ...
 
     @abstractmethod
@@ -374,6 +382,10 @@ class BaseClient(ABC):
         telemetry: TelemetryRequest = False,
         *,
         keep_recent_count: int = 0,
+        retention_mode: str | None = None,
+        keep_recent_turn_count: int | None = None,
+        retained_message_token_budget: int | None = None,
+        min_raw_tail_steps: int | None = None,
     ) -> Dict[str, Any]:
         """Commit a session (archive and extract memories).
 
@@ -394,6 +406,9 @@ class BaseClient(ABC):
         created_at: str | None = None,
         peer_id: str | None = None,
         telemetry: TelemetryRequest = False,
+        turn_id: str | None = None,
+        message_kind: str | None = None,
+        source_message_ids: list[str] | None = None,
     ) -> Dict[str, Any]:
         """Add a message to a session.
 
@@ -433,6 +448,11 @@ class BaseClient(ABC):
     @abstractmethod
     async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Query background task status."""
+        ...
+
+    @abstractmethod
+    async def cancel_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Cancel a background task."""
         ...
 
     @abstractmethod
@@ -592,6 +612,20 @@ class BaseClient(ABC):
         paths: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Walk back along parents[0] up to limit commits."""
+
+    async def git_diff(
+        self,
+        path: str,
+        *,
+        to_ref: str,
+        from_ref: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Compare one file between two snapshot refs.
+
+        The default keeps third-party subclasses written against older
+        OpenViking releases instantiable while making unsupported use explicit.
+        """
+        raise NotImplementedError("snapshot diff is not supported by this client")
 
     @abstractmethod
     async def git_get_ignore(self) -> str:

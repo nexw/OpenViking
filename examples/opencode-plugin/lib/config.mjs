@@ -1,8 +1,13 @@
 import fs from "fs"
 import path from "path"
 import { homedir } from "os"
-import { resolveOpenVikingCredentials } from "./shared/credentials.mjs"
+import { buildUserAgent, readManifestVersion, resolveOpenVikingCredentials } from "./shared/credentials.mjs"
 import { resolveEffectivePeerId } from "./shared/workspace-peer.mjs"
+
+const USER_AGENT = buildUserAgent(
+  "opencode",
+  readManifestVersion(new URL("../package.json", import.meta.url)),
+)
 
 const DEFAULT_CONFIG = {
   endpoint: "http://127.0.0.1:1933",
@@ -216,6 +221,7 @@ function normalizeConfig(config) {
   config.baseUrl = config.endpoint
   config.accountId = config.account
   config.userId = config.user
+  config.userAgent = USER_AGENT
   config.timeoutMs = normalizeNumber(config.timeoutMs, DEFAULT_CONFIG.timeoutMs, 1000, 300000)
   config.repoContext.cacheTtlMs = normalizeNumber(
     config.repoContext.cacheTtlMs,
@@ -233,7 +239,14 @@ function normalizeConfig(config) {
   config.captureMaxLength = Math.max(200, Math.min(100000, Math.round(Number(config.captureMaxLength) || 24000)))
   config.captureToolMaxChars = Math.max(200, Math.min(20000, Math.round(Number(config.captureToolMaxChars) || 2000)))
   config.commitTokenThreshold = Math.max(1000, Math.round(Number(config.commitTokenThreshold) || 20000))
-  config.commitKeepRecentCount = Math.max(0, Math.round(Number(config.commitKeepRecentCount) || 10))
+  const rawCommitKeepRecentCount = config.commitKeepRecentCount
+  const commitKeepRecentCount = rawCommitKeepRecentCount == null ||
+    (typeof rawCommitKeepRecentCount === "string" && rawCommitKeepRecentCount.trim() === "")
+    ? Number.NaN
+    : Number(rawCommitKeepRecentCount)
+  config.commitKeepRecentCount = Number.isFinite(commitKeepRecentCount)
+    ? Math.max(0, Math.round(commitKeepRecentCount))
+    : DEFAULT_CONFIG.commitKeepRecentCount
   config.profileTokenBudget = Math.max(500, Math.round(Number(config.profileTokenBudget) || 10000))
   config.resumeContextBudget = Math.max(1024, Math.round(Number(config.resumeContextBudget) || 32000))
   if (!Array.isArray(config.bypassSessionPatterns)) config.bypassSessionPatterns = []

@@ -10,7 +10,7 @@ Verifies fix for https://github.com/volcengine/OpenViking/issues/251:
 import pytest
 
 from openviking.parse.accessors.http_accessor import HTTPAccessor, URLType, URLTypeDetector
-from openviking.parse.accessors.mime_types import get_preferred_extension
+from openviking.parse.accessors.mime_types import get_all_extensions, get_preferred_extension
 
 
 class TestExtractFilenameFromUrl:
@@ -70,6 +70,20 @@ class TestURLTypeDetectorCodeExtensions:
         url = "https://example.com/path/index.js"
         url_type, meta = await self.detector.detect(url)
         assert url_type == URLType.DOWNLOAD_TXT
+
+    @pytest.mark.asyncio
+    async def test_ts_extension_defaults_to_video_when_headers_unavailable(self, monkeypatch):
+        _patch_httpx_client(
+            monkeypatch,
+            headers={"content-type": "text/plain"},
+            content=b"export const value = 1;\n",
+        )
+
+        url_type, meta = await self.detector.detect("https://example.com/path/index.ts")
+
+        assert url_type == URLType.DOWNLOAD_VIDEO
+        assert meta["detected_by"] == "extension"
+        assert meta["extension"] == ".ts"
 
     @pytest.mark.asyncio
     async def test_yaml_extension_detected(self):
@@ -172,6 +186,19 @@ class TestHTTPAccessorGetFallback:
 
     def test_audio_ac3_mime_type_preserves_extension(self):
         assert get_preferred_extension("audio/ac3") == ".ac3"
+
+    def test_content_type_alias_with_parameters_preserves_extension(self):
+        assert get_preferred_extension("image/jpg; profile=display-p3") == ".jpg"
+        assert get_all_extensions("image/jpg; profile=display-p3") == [".jpg", ".jpeg"]
+
+    def test_content_type_alias_with_parameters_routes_to_pdf(self):
+        detector = URLTypeDetector()
+        metadata = {}
+
+        url_type = detector._detect_from_media_type("application/x-pdf; charset=binary", metadata)
+
+        assert url_type == URLType.DOWNLOAD_PDF
+        assert metadata["media_type_alias"] == "application/x-pdf"
 
     @pytest.mark.asyncio
     async def test_ac3_url_with_generic_content_type_stays_audio(self, monkeypatch):

@@ -120,7 +120,7 @@ curl -X POST http://localhost:1933/api/v1/resources/temp_upload \
 ```
 
 这个接口当前只支持布尔形态的表单参数。
-这个接口的 `upload_mode` 也是表单字段；默认值为 `local`，只有在明确需要分布式共享临时上传时，才应设置为 `shared`。Python HTTP client / CLI 用户也可以通过 `ovcli.conf` 的 `upload.mode = "shared"` 达到同样效果。
+这个接口的 `upload_mode` 也是表单字段；默认值为 `local`，只有在明确需要分布式共享临时上传时，才应设置为 `shared`。Python HTTP client 也可以在 `ovcli.conf` 中设置 `upload.mode = "shared"`；Rust `ov` CLI 则使用 `OPENVIKING_UPLOAD_MODE=shared`。
 
 ## 常见 summary 分组
 
@@ -187,6 +187,11 @@ CPU/GPU 路由和分阶段耗时；并发 query 的完成顺序不会改变结�
 | `summary.vector.cuvs.dtypes.<dtype>` | 按 GPU dataset/query dtype 统计的 search 数：`float32` 或 `float16` |
 | `summary.vector.cuvs.max_concurrent_gpu_searches` | 观测到的单 index in-flight GPU search 配置上限最大值 |
 | `summary.vector.cuvs.auto_mode_searches` | 启用自动 CPU/GPU 路由的 search 数量 |
+| `summary.vector.cuvs.micro_batching_searches` | 使用 OpenViking 可选 micro-batch scheduler 的 search 数量 |
+| `summary.vector.cuvs.micro_batched_searches` | 其中以多于一行 query 共同 dispatch 的 search 数量 |
+| `summary.vector.cuvs.micro_batching_warm_fast_path_searches` | 使用 micro-batch scheduler、从 clean current snapshot 入队且未经过 caller 侧 device-gate admission 的 search 数量 |
+| `summary.vector.cuvs.batch_size_max` | 单次共享 cuVS call 观测到的最大 query 行数 |
+| `summary.vector.cuvs.searches_by_batch_size.<size>` | 按 1 到 8 的有界 batch size 统计 search 数量 |
 | `summary.vector.cuvs.routes.<reason>` | 按路由原因统计的 search 数，例如 `cuvs`、`native_filter_threshold`、`native_rebuild_pending` 或 `native_memory_budget` |
 | `summary.vector.cuvs.filter_kinds.<kind>` | 按低基数 filter 类型统计的 search 数：`none`、`scalar` 或 `path` |
 | `summary.vector.cuvs.filter_cache_hits` | 复用 prepared/preflight filter 的 search 数量 |
@@ -198,8 +203,17 @@ CPU/GPU 路由和分阶段耗时；并发 query 的完成顺序不会改变结�
 | `summary.vector.cuvs.memory.estimated_peak_bytes_max` | auto build 准入使用的最大峰值显存估算 |
 | `summary.vector.cuvs.memory.free_bytes_min` | 单 GPU 准入协调器内观测到的最小空闲显存 |
 | `summary.vector.cuvs.memory.usable_bytes_min` | 扣除配置 reserve 后观测到的最小可用显存 |
-| `summary.vector.cuvs.timings_ms.<stage>.sum` | `total`、`preflight`、`queue`、`build`、`filter_prepare`、`gpu_search` 或 `native_search` 阶段跨 search 的耗时总和 |
+| `summary.vector.cuvs.timings_ms.<stage>.sum` | `total`、`preflight`、`queue`、`gpu_gate_queue`、`build`、`filter_prepare`、`batch_wait`、`gpu_search` 或 `native_search` 阶段跨 search 的耗时总和 |
 | `summary.vector.cuvs.timings_ms.<stage>.max` | 同一阶段单次 search 的最大耗时 |
+
+对于共享 micro-batch，`gpu_search` 表示每个成员请求所感知的同一次 cuVS call
+service latency，因此会按请求各记录一次。`gpu_search.sum` 适合解释请求侧累计延迟，
+但不等同于 GPU busy time；它可能约为物理 call 时长乘以 batch size。`batch_wait`
+表示请求从进入 scheduler 到 GPU dispatch 的等待时间，包括 worker 调度和等待当前 device
+work 完成的时间。`gpu_gate_queue` 表示 caller 在 gated rebuild/filter preparation、入队或
+非 batch GPU search 前，等待进入串行 device gate 的时间。warm fast path 会跳过这次 caller
+admission，所以其 `gpu_gate_queue` 为零；worker 侧等待仍计入 `batch_wait`。更宽泛的 `queue`
+阶段会在适用时包含这两类请求可感知的排队时间。
 
 ### `summary.resource`
 

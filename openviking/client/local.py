@@ -8,6 +8,7 @@ Implements BaseClient interface using direct service calls (embedded mode).
 from typing import Any, Dict, List, Optional, Union
 
 from openviking.core.peer_id import normalize_peer_id
+from openviking.core.skill_loader import validate_skill_format
 from openviking.server.identity import RequestContext, Role
 from openviking.server.routers.skills import (
     _list_skill_files,
@@ -15,7 +16,6 @@ from openviking.server.routers.skills import (
     _require_skill,
     _restore_skill_privacy,
     _skill_summary_from_hit,
-    _validate_skill_format,
 )
 from openviking.service import OpenVikingService
 from openviking.service.task_tracker import get_task_tracker
@@ -26,9 +26,9 @@ from openviking.telemetry.execution import (
 )
 from openviking.utils.image_search import normalize_client_image_input
 from openviking.utils.search_filters import SearchContextTypeInput, merge_search_filter
-from openviking.utils.tags import normalize_search_tags
+from openviking.utils.tags import build_search_tags_filter
 from openviking_cli.client.base import BaseClient
-from openviking_cli.exceptions import InvalidArgumentError, NotFoundError
+from openviking_cli.exceptions import InvalidArgumentError, NotFoundError, PermissionDeniedError
 from openviking_cli.session.user_id import UserIdentifier
 from openviking_cli.utils import run_async
 
@@ -61,11 +61,12 @@ def _resolve_search_filter(
         until=until,
         time_field=time_field,
     )
-    normalized_tags = normalize_search_tags(tags)
-    if not normalized_tags:
+    tag_filter = build_search_tags_filter(tags)
+    if not tag_filter:
         return merged
-    tag_filter = {"op": "must", "field": "search_tags", "conds": normalized_tags}
     if merged:
+        if tag_filter.get("op") == "and" and isinstance(tag_filter.get("conds"), list):
+            return {"op": "and", "conds": [merged, *tag_filter["conds"]]}
         return {"op": "and", "conds": [merged, tag_filter]}
     return tag_filter
 
@@ -103,7 +104,6 @@ class LocalClient(BaseClient):
             user=self._user,
             role=Role.USER,
             actor_peer_id=normalize_peer_id(effective_actor_peer_id),
-            legacy_agent_id=normalize_peer_id(agent_id),
         )
 
     @property
@@ -137,9 +137,23 @@ class LocalClient(BaseClient):
         telemetry: TelemetryRequest = False,
         watch_interval: float = 0,
         args: Optional[Dict[str, Any]] = None,
+        processing_mode: str = "semantic_and_vectors",
+        add_type: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        tag_mode: str = "replace",
         **kwargs,
     ) -> Dict[str, Any]:
-        """Add resource to OpenViking."""
+        """Add resource to OpenViking.
+
+        ``add_type`` declares a Connector source and requires an exact ``to``
+        target; it cannot be combined with ``parent``.
+        """
+        if add_type is not None:
+            add_type = add_type.strip() or None
+        if add_type and parent:
+            raise ValueError("'add_type' cannot be combined with 'parent'.")
+        if add_type and not to:
+            raise ValueError("'add_type' requires an exact 'to' target.")
         if to and parent:
             raise ValueError("Cannot specify both 'to' and 'parent' at the same time.")
 
@@ -149,6 +163,7 @@ class LocalClient(BaseClient):
             fn=lambda: self._service.resources.add_resource(
                 path=path,
                 ctx=self._ctx,
+                add_type=add_type,
                 to=to,
                 parent=parent,
                 reason=reason,
@@ -157,8 +172,11 @@ class LocalClient(BaseClient):
                 timeout=timeout,
                 build_index=build_index,
                 summarize=summarize,
+                processing_mode=processing_mode,
                 watch_interval=watch_interval,
                 args=args,
+                tags=tags,
+                tag_mode=tag_mode,
                 **kwargs,
             ),
         )
@@ -492,8 +510,7 @@ class LocalClient(BaseClient):
         target_uri: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Validate skill data."""
-        result = _validate_skill_format(
-            self._service,
+        result = validate_skill_format(
             data,
             strict=strict,
             skill_dir_name=skill_dir_name,
@@ -616,7 +633,12 @@ class LocalClient(BaseClient):
             offset: Starting line number (0-indexed). Default 0.
             limit: Number of lines to read. -1 means read to end. Default -1.
         """
-        return await self._service.fs.read(uri, ctx=self._ctx, offset=offset, limit=limit)
+        return await self._service.fs.read_visible(
+            uri,
+            ctx=self._ctx,
+            offset=offset,
+            limit=limit,
+        )
 
     async def read_raw(self, uri: str, offset: int = 0, limit: int = -1) -> str:
         """Read raw file content, including hidden MEMORY_FIELDS metadata."""
@@ -749,7 +771,8 @@ class LocalClient(BaseClient):
 
         async def _search():
             session = None
-            if session_id:
+            # Intent off: skip session.load — SearchService will not scan session either.
+            if session_id and self._service.search.is_intent_enabled():
                 session = self._service.sessions.session(self._ctx, session_id)
                 await session.load()
             return await self._service.search.search(
@@ -889,15 +912,29 @@ class LocalClient(BaseClient):
         telemetry: TelemetryRequest = False,
         *,
         keep_recent_count: int = 0,
+        retention_mode: Optional[str] = None,
+        keep_recent_turn_count: Optional[int] = None,
+        retained_message_token_budget: Optional[int] = None,
+        min_raw_tail_steps: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Commit a session (archive and extract memories)."""
+        commit_kwargs: Dict[str, Any] = {"keep_recent_count": keep_recent_count}
+        optional_retention = {
+            "retention_mode": retention_mode,
+            "keep_recent_turn_count": keep_recent_turn_count,
+            "retained_message_token_budget": retained_message_token_budget,
+            "min_raw_tail_steps": min_raw_tail_steps,
+        }
+        commit_kwargs.update(
+            {key: value for key, value in optional_retention.items() if value is not None}
+        )
         execution = await run_with_telemetry(
             operation="session.commit",
             telemetry=telemetry,
             fn=lambda: self._service.sessions.commit(
                 session_id,
                 self._ctx,
-                keep_recent_count=keep_recent_count,
+                **commit_kwargs,
             ),
         )
         return attach_telemetry_payload(
@@ -908,6 +945,17 @@ class LocalClient(BaseClient):
     async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Query background task status."""
         return await self._service.sessions.get_commit_task(task_id, self._ctx)
+
+    async def cancel_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Cancel a background task."""
+        if self._ctx.role == Role.ROOT:
+            raise PermissionDeniedError("ROOT may not cancel tasks")
+        task = await get_task_tracker().cancel(
+            task_id,
+            account_id=self._ctx.account_id,
+            user_id=self._ctx.user.user_id,
+        )
+        return task.to_dict() if task else None
 
     async def list_tasks(
         self,
@@ -936,6 +984,9 @@ class LocalClient(BaseClient):
         created_at: Optional[str] = None,
         peer_id: Optional[str] = None,
         telemetry: TelemetryRequest = False,
+        turn_id: Optional[str] = None,
+        message_kind: Optional[str] = None,
+        source_message_ids: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Add a message to a session.
 
@@ -959,6 +1010,9 @@ class LocalClient(BaseClient):
                 parts,
                 created_at,
                 peer_id,
+                turn_id,
+                message_kind,
+                source_message_ids,
             ),
         )
         return attach_telemetry_payload(
@@ -974,6 +1028,9 @@ class LocalClient(BaseClient):
         parts: Optional[List[Dict[str, Any]]],
         created_at: Optional[str],
         peer_id: Optional[str],
+        turn_id: Optional[str],
+        message_kind: Optional[str],
+        source_message_ids: Optional[List[str]],
     ) -> Dict[str, Any]:
         from openviking.message.part import Part, TextPart, part_from_dict
 
@@ -987,15 +1044,31 @@ class LocalClient(BaseClient):
         else:
             raise ValueError("Either content or parts must be provided")
 
-        session.add_message(
-            role,
-            message_parts,
-            peer_id=self._resolve_message_peer_id(role, peer_id),
-            created_at=created_at,
-        )
+        semantic_kwargs = {
+            key: value
+            for key, value in {
+                "turn_id": turn_id,
+                "message_kind": message_kind,
+                "source_message_ids": source_message_ids,
+            }.items()
+            if value is not None
+        }
+        add_async = getattr(session, "add_message_async", None)
+        add_kwargs = {
+            "peer_id": normalize_peer_id(peer_id),
+            "created_at": created_at,
+            **semantic_kwargs,
+        }
+        if callable(add_async):
+            await add_async(role, message_parts, **add_kwargs)
+        else:
+            session.add_message(role, message_parts, **add_kwargs)
         return {
             "session_id": session_id,
             "message_count": len(session.messages),
+            # Post-write value so a commit policy can decide without a
+            # follow-up get_session round trip.
+            "pending_tokens": self._session_pending_tokens(session),
         }
 
     async def batch_add_messages(
@@ -1042,30 +1115,40 @@ class LocalClient(BaseClient):
                 {
                     "role": role,
                     "parts": message_parts,
-                    "peer_id": self._resolve_message_peer_id(role, message.get("peer_id")),
+                    "peer_id": normalize_peer_id(message.get("peer_id")),
                     "created_at": message.get("created_at"),
+                    "turn_id": message.get("turn_id"),
+                    "message_kind": message.get("message_kind"),
+                    "source_message_ids": message.get("source_message_ids"),
                 }
             )
 
-        added = session.add_messages(specs)
+        add_many_async = getattr(session, "add_messages_async", None)
+        if callable(add_many_async):
+            added = await add_many_async(specs)
+        else:
+            added = session.add_messages(specs)
         return {
             "session_id": session_id,
             "message_count": len(session.messages),
             "added": len(added),
+            # Post-write value so a commit policy can decide without a
+            # follow-up get_session round trip.
+            "pending_tokens": self._session_pending_tokens(session),
         }
 
-    def _resolve_message_peer_id(
-        self,
-        role: str,
-        peer_id: Optional[str],
-    ) -> Optional[str]:
-        normalized_peer_id = normalize_peer_id(peer_id)
-        if normalized_peer_id is not None:
-            return normalized_peer_id
-        legacy_agent_id = getattr(self._ctx, "legacy_agent_id", None)
-        if legacy_agent_id is not None and role == "assistant":
-            return legacy_agent_id
-        return None
+    @staticmethod
+    def _session_pending_tokens(session: Any) -> int:
+        """Read the post-write pending-token count from a session.
+
+        Returns 0 when the session object does not expose ``meta`` so callers
+        keep working against lightweight or legacy session implementations.
+        """
+        meta = getattr(session, "meta", None)
+        try:
+            return max(0, int(getattr(meta, "pending_tokens", 0) or 0))
+        except (TypeError, ValueError):
+            return 0
 
     # ============= Pack =============
 
@@ -1183,6 +1266,21 @@ class LocalClient(BaseClient):
     ) -> List[Dict[str, Any]]:
         """Walk back along parents[0] up to limit commits."""
         return await self._service.fs.log(branch=branch, limit=limit, paths=paths, ctx=self._ctx)
+
+    async def git_diff(
+        self,
+        path: str,
+        *,
+        to_ref: str,
+        from_ref: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Compare one file between two snapshot refs."""
+        return await self._service.fs.diff(
+            path=path,
+            from_ref=from_ref,
+            to_ref=to_ref,
+            ctx=self._ctx,
+        )
 
     async def git_get_ignore(self) -> str:
         """Return the account .ovgitignore content (empty string if absent)."""

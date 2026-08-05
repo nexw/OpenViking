@@ -29,7 +29,7 @@ from openviking.utils.search_filters import (
     _resolve_levels,
     merge_search_filter,
 )
-from openviking.utils.tags import normalize_search_tags
+from openviking.utils.tags import build_search_tags_filter
 from openviking_cli.exceptions import InvalidArgumentError, NotFoundError
 
 
@@ -70,15 +70,12 @@ def _resolve_search_filter(
             until=until,
             time_field=time_field,
         )
-        normalized_tags = normalize_search_tags(tags)
-        if not normalized_tags:
+        tag_filter = build_search_tags_filter(tags)
+        if not tag_filter:
             return merged
-        tag_filter: Dict[str, Any] = {
-            "op": "must",
-            "field": "search_tags",
-            "conds": normalized_tags,
-        }
         if merged:
+            if tag_filter.get("op") == "and" and isinstance(tag_filter.get("conds"), list):
+                return {"op": "and", "conds": [merged, *tag_filter["conds"]]}
             return {"op": "and", "conds": [merged, tag_filter]}
         return tag_filter
     except ValueError as exc:
@@ -101,8 +98,6 @@ class FindRequest(BaseModel):
     image_url: Optional[str] = None
     target_uri: Union[str, List[str]] = ""
     context_type: Optional[Union[str, List[str]]] = None
-    agent_id: Optional[str] = None
-    agent_uri: Optional[str] = None
     limit: int = 10
     node_limit: Optional[int] = None
     score_threshold: Optional[float] = None
@@ -125,8 +120,6 @@ class SearchRequest(BaseModel):
     image_url: Optional[str] = None
     target_uri: Union[str, List[str]] = ""
     context_type: Optional[Union[str, List[str]]] = None
-    agent_id: Optional[str] = None
-    agent_uri: Optional[str] = None
     session_id: Optional[str] = None
     limit: int = 10
     node_limit: Optional[int] = None
@@ -238,7 +231,8 @@ async def search(
 
     async def _search():
         session = None
-        if request.session_id:
+        # Intent off: skip session.load — SearchService will not scan session either.
+        if request.session_id and service.search.is_intent_enabled():
             session = service.sessions.session(_ctx, request.session_id)
             await session.load()
         return await service.search.search(
