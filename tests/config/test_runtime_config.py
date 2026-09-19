@@ -17,6 +17,7 @@ smallest meaningful public contracts across both:
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Optional
 
 import pytest
@@ -736,10 +737,11 @@ def test_runtime_cluster_ignores_future_top_level_override_and_preserves_it():
     asyncio.run(run())
 
 
-def test_persisted_known_sections_ignore_future_nested_fields():
+def test_persisted_known_sections_ignore_future_nested_fields(caplog):
     from openviking.config.binding import _build_account, _build_cluster
     from openviking_cli.utils.config.open_viking_config import OpenVikingConfig
 
+    caplog.set_level(logging.WARNING, logger="openviking.config.binding")
     cluster = _build_cluster(
         OpenVikingConfig.from_dict({}),
         {"agent_evolution": {"enabled": True, "future_option": 1}},
@@ -754,6 +756,8 @@ def test_persisted_known_sections_ignore_future_nested_fields():
     )
     assert account.github.token == "t"
     assert account.acl.enabled is True
+    assert "Ignoring unknown config field 'github.future_option'" in caplog.text
+    assert "Ignoring unknown config field 'acl.retired_field'" in caplog.text
 
 
 def test_openviking_config_ignores_unknown_top_level_field():
