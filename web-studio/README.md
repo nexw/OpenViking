@@ -375,7 +375,7 @@ Check server logs for `Bot API proxy enabled`.
 
 ### Bot management endpoints return 503
 
-`/api/v1/admin/accounts/{account}/bot/*` needs the gateway shared secret. Make sure `server.bot_gateway_token` (or the `OPENVIKING_BOT_STUDIO_TOKEN` environment variable, or `bot.gateway.token` in the same ov.conf) matches the gateway's `bot.gateway.token`. External mode additionally requires the gateway to run on the same host as the OpenViking server, because the management routes only accept loopback requests.
+`/api/v1/admin/accounts/{account}/bot/*` needs the gateway shared secret. Make sure `server.bot_gateway_token` (or the `OPENVIKING_BOT_STUDIO_TOKEN` environment variable, or `bot.gateway.token` in the same ov.conf) matches the gateway's `bot.gateway.token`. The gateway may run on a different host than the OpenViking server; terminate TLS in front of it before exposing it to a network.
 
 ### Client Generation Cannot Fetch OpenAPI
 

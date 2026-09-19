@@ -239,7 +239,7 @@ To also reach this standalone gateway through an OpenViking Server (`ov chat`, t
 }
 ```
 
-A non-empty `server.bot_api_url` without `server.with_bot` enables external mode: the server proxies only and never starts or restarts the gateway. The management routes accept loopback requests only, so both must run on the same host.
+A non-empty `server.bot_api_url` without `server.with_bot` enables external mode: the server proxies only and never starts or restarts the gateway, and the two may run on different hosts. Management is gated by the shared token; terminate TLS in front of the gateway before exposing it, and make sure the gateway's `bot.ov_server.server_url` is reachable (remote identity is verified the same way as for a direct client).
 
 ### 3. Point the `ov` CLI to the Gateway
 

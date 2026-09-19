@@ -318,6 +318,11 @@ External mode example (gateway deployed independently, for example as its own sy
 
 `bot_api_url` may also point at a reverse-proxy entry point (for example a gateway published under the same domain by Caddy), as long as the address reaches the gateway.
 
+The gateway does not have to run on the OpenViking Server's host. When it does not:
+
+- Bot management is gated by the shared token alone, with no loopback requirement; terminate TLS in front of the gateway before exposing it to a network.
+- Identity is no longer asserted in the request body — that assertion is only honored for a loopback gateway — but forwarded as the caller's `X-API-Key` and `X-OpenViking-*` headers, which the gateway verifies against OpenViking exactly as it does for a direct client. The gateway's `bot.ov_server.server_url` must therefore be reachable, and `dev` auth still cannot cross hosts (its local-development boundary requires both ends on loopback).
+
 ### Encryption and API Key Hashing
 
 File encryption and API key hashing are configured in the top-level `encryption` section, not under `server`:

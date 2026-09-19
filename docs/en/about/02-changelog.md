@@ -10,7 +10,10 @@ This changelog is automatically generated from [GitHub Releases](https://github.
   works without `--with-bot`. Its default changed from `http://localhost:18790` to empty, and
   `with_bot` keeps its managed semantics and wins when both are set. Set
   `server.bot_gateway_token` to the gateway's `bot.gateway.token` to enable Web Studio channel
-  management, which also requires both processes on the same host (loopback only). The
+  management. The gateway no longer has to share the OpenViking server's host: management is
+  gated by the shared token instead of loopback (terminate TLS in front of a network-exposed
+  gateway), and a remote gateway receives the caller's `X-API-Key`/`X-OpenViking-*` headers
+  instead of the body-level identity assertion, which remains loopback-only. The
   `/api/v1/admin/bot/capabilities` response gains a `mode` field (`managed`/`external`/`disabled`)
   and reports `enabled: true` for external gateways.
 - **Watch API migration (breaking change)**: Re-importing with `watch_interval > 0`

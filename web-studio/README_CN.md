@@ -374,7 +374,7 @@ openviking-server --with-bot
 
 ### 机器管理接口返回 503
 
-`/api/v1/admin/accounts/{account}/bot/*` 需要网关共享密钥。确认 `server.bot_gateway_token`（或环境变量 `OPENVIKING_BOT_STUDIO_TOKEN`，或同一份 ov.conf 中的 `bot.gateway.token`）与网关的 `bot.gateway.token` 一致；外部模式下还要求该网关与 OpenViking Server 在同一台主机（管理接口只接受 loopback 请求）。
+`/api/v1/admin/accounts/{account}/bot/*` 需要网关共享密钥。确认 `server.bot_gateway_token`（或环境变量 `OPENVIKING_BOT_STUDIO_TOKEN`，或同一份 ov.conf 中的 `bot.gateway.token`）与网关的 `bot.gateway.token` 一致；网关可以与 OpenViking Server 不同主机，跨主机暴露时务必在网关前终止 TLS。
 
 ### 生成 client 时拉不到 OpenAPI
 

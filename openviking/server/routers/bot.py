@@ -6,6 +6,7 @@ Vikingbot OpenAPIChannel when the --with-bot option is enabled.
 
 import json
 from typing import AsyncGenerator, Optional
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -161,6 +162,55 @@ def _attach_openviking_connection(
     return enriched
 
 
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def _bot_gateway_is_loopback() -> bool:
+    """True when the configured gateway is reached over loopback.
+
+    Identity may only be asserted in the request body (``openviking_connection``)
+    for a loopback gateway, because the Bot gateway trusts that field solely from
+    a local server proxy. Anything else must present real credentials.
+    """
+    if not BOT_API_URL:
+        return False
+    host = (urlparse(str(BOT_API_URL)).hostname or "").strip().lower()
+    return host in _LOOPBACK_HOSTS
+
+
+def _forwarded_identity_headers(request: Request, ctx: RequestContext) -> dict[str, str]:
+    """Identity headers for a gateway that cannot trust a forwarded assertion.
+
+    Mirrors what a directly connected client sends, so the gateway resolves the
+    caller through its normal OpenViking authentication (``X-API-Key`` plus the
+    account/user hints it cross-checks against the upstream server) instead of
+    accepting an unverifiable identity claim.
+    """
+    headers: dict[str, str] = {}
+    api_key = _extract_forward_api_key(request) or str(ctx.api_key or "")
+    if api_key:
+        headers["X-API-Key"] = api_key
+    headers["X-OpenViking-Account"] = ctx.user.account_id
+    headers["X-OpenViking-User"] = ctx.user.user_id
+    actor_peer_id = str(ctx.actor_peer_id or "").strip()
+    if actor_peer_id:
+        headers["X-OpenViking-Actor-Peer"] = actor_peer_id
+    return headers
+
+
+def _prepare_bot_proxy_call(
+    body: dict, request: Request, ctx: RequestContext
+) -> tuple[dict, dict[str, str]]:
+    """Return the JSON body and extra headers for one Bot gateway call."""
+    enriched = _attach_openviking_connection(body, request, ctx)
+    if _bot_gateway_is_loopback():
+        return enriched, {}
+    # A remote gateway rejects body-level identity assertions; carry the same
+    # identity as headers for it to authenticate itself.
+    enriched.pop("openviking_connection", None)
+    return enriched, _forwarded_identity_headers(request, ctx)
+
+
 @router.post("/compile")
 async def create_compile(
     _ctx: RequestContext = Depends(get_request_context),
@@ -256,17 +306,20 @@ async def chat(
             detail="Invalid JSON in request body",
         )
 
+    payload, identity_headers = _prepare_bot_proxy_call(body, request, _ctx)
+
     try:
         async with _create_bot_proxy_client() as client:
             # Build headers for bot gateway
             headers = {"Content-Type": "application/json"}
+            headers.update(identity_headers)
             if BOT_API_KEY:
                 headers["X-Gateway-Token"] = BOT_API_KEY
 
             # Forward to Vikingbot OpenAPIChannel chat endpoint
             response = await client.post(
                 f"{bot_url}/bot/v1/chat",
-                json=_attach_openviking_connection(body, request, _ctx),
+                json=payload,
                 headers=headers,
                 timeout=300.0,  # 5 minute timeout for chat
             )
@@ -308,15 +361,18 @@ async def feedback(
             detail="Invalid JSON in request body",
         )
 
+    payload, identity_headers = _prepare_bot_proxy_call(body, request, _ctx)
+
     try:
         async with _create_bot_proxy_client() as client:
             headers = {"Content-Type": "application/json"}
+            headers.update(identity_headers)
             if BOT_API_KEY:
                 headers["X-Gateway-Token"] = BOT_API_KEY
 
             response = await client.post(
                 f"{bot_url}/bot/v1/feedback",
-                json=_attach_openviking_connection(body, request, _ctx),
+                json=payload,
                 headers=headers,
                 timeout=30.0,
             )
@@ -361,12 +417,15 @@ async def chat_stream(
             detail="Invalid JSON in request body",
         )
 
+    payload, identity_headers = _prepare_bot_proxy_call(body, request, _ctx)
+
     async def event_stream() -> AsyncGenerator[str, None]:
         """Generate SSE events from bot response stream."""
         try:
             async with _create_bot_proxy_client() as client:
                 # Build headers for bot gateway
                 headers = {"Content-Type": "application/json"}
+                headers.update(identity_headers)
                 if BOT_API_KEY:
                     headers["X-Gateway-Token"] = BOT_API_KEY
 
@@ -374,7 +433,7 @@ async def chat_stream(
                 async with client.stream(
                     "POST",
                     f"{bot_url}/bot/v1/chat/stream",
-                    json=_attach_openviking_connection(body, request, _ctx),
+                    json=payload,
                     headers=headers,
                     timeout=300.0,
                 ) as response:

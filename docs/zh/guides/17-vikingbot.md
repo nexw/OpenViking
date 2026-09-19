@@ -238,7 +238,7 @@ vikingbot gateway
 }
 ```
 
-`server.bot_api_url` 非空且未启用 `server.with_bot` 时进入外部模式：服务端只代理，不启动也不重启 Gateway。机器管理接口只接受 loopback 请求，因此两者需在同一台主机。
+`server.bot_api_url` 非空且未启用 `server.with_bot` 时进入外部模式：服务端只代理，不启动也不重启 Gateway，两者可以在不同主机。管理接口以共享令牌校验；跨主机暴露时需在网关前终止 TLS，且网关的 `bot.ov_server.server_url` 必须可达（远端身份按直连客户端方式复核）。
 
 ### 3. 让 `ov` CLI 使用 Gateway
 

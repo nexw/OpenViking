@@ -318,6 +318,11 @@ Search 和 Find 请求的默认 `limit` 为 `10`，可以在每次 API 或 SDK �
 
 `bot_api_url` 也可以指向反向代理入口（例如网关经 Caddy 暴露在同一域名下），只要该地址最终能到达网关。
 
+网关与 OpenViking Server 可以不在同一台主机。此时：
+
+- 机器管理接口以共享令牌为唯一门槛，不再要求来源为 loopback；暴露到网络前必须在网关前终止 TLS。
+- 身份不再以请求体内的断言传递（该断言仅对 loopback 网关有效），改为转发调用方的 `X-API-Key` 与 `X-OpenViking-*` 头，由网关按直连客户端的方式向 OpenViking 复核。因此网关的 `bot.ov_server.server_url` 必须可达，且 `dev` 模式仍不允许跨主机（其本地开发边界要求两端都在 loopback）。
+
 ### 文件加密与 API Key 哈希
 
 文件加密和 API Key 哈希在顶层 `encryption` 中配置，不属于 `server`：
