@@ -20,9 +20,13 @@ router = APIRouter(prefix="", tags=["bot"])
 
 logger = get_logger(__name__)
 
-# Bot API configuration - set when --with-bot is enabled
+# Bot API configuration - set from ServerConfig at app creation
 BOT_API_URL: Optional[str] = None  # e.g., "http://localhost:18791"
 BOT_API_KEY: str = ""
+# How the gateway is provided: "managed" (server-owned child process),
+# "external" (server.bot_api_url points at an independently deployed gateway),
+# or "disabled" (no gateway configured).
+BOT_MODE: str = "disabled"
 DEFAULT_BOT_AGENT_ID = "web-playground"
 
 
@@ -37,7 +41,7 @@ def _create_bot_proxy_client() -> httpx.AsyncClient:
 
 
 def set_bot_api_url(url: str) -> None:
-    """Set the Bot API URL. Called by app.py when --with-bot is enabled."""
+    """Set the Bot API URL. Called by app.py when a gateway is configured."""
     global BOT_API_URL
     BOT_API_URL = url
 
@@ -48,12 +52,26 @@ def set_bot_api_key(api_key: str) -> None:
     BOT_API_KEY = api_key or ""
 
 
+def set_bot_mode(mode: str) -> None:
+    """Set how the gateway is provided: managed, external or disabled."""
+    global BOT_MODE
+    BOT_MODE = mode
+
+
+def get_bot_mode() -> str:
+    """Return the configured gateway mode."""
+    return BOT_MODE
+
+
 def get_bot_url() -> str:
     """Get the Bot API URL, raising 503 if not configured."""
     if BOT_API_URL is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Bot service not enabled. Start server with --with-bot option.",
+            detail=(
+                "Bot service not enabled. Start the server with --with-bot, or "
+                "point server.bot_api_url at a running VikingBot gateway."
+            ),
         )
     return BOT_API_URL
 

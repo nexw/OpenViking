@@ -228,6 +228,19 @@ The Gateway has three OpenViking connection states:
 vikingbot gateway
 ```
 
+To also reach this standalone gateway through an OpenViking Server (`ov chat`, the `/bot/v1/*` proxy, Web Studio bot management), add the gateway to that Server's `server` section:
+
+```json
+{
+  "server": {
+    "bot_api_url": "http://127.0.0.1:18790",
+    "bot_gateway_token": "<bot.gateway.token>"
+  }
+}
+```
+
+A non-empty `server.bot_api_url` without `server.with_bot` enables external mode: the server proxies only and never starts or restarts the gateway. The management routes accept loopback requests only, so both must run on the same host.
+
 ### 3. Point the `ov` CLI to the Gateway
 
 Edit `~/.openviking/ovcli.conf`:

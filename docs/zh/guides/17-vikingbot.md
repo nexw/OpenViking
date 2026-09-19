@@ -227,6 +227,19 @@ Gateway 有三种 OpenViking 连接状态：
 vikingbot gateway
 ```
 
+如果还需要通过 OpenViking Server 使用 Bot（`ov chat`、`/bot/v1/*` 代理、Web Studio 的机器人管理），在该 Server 的 `server` 段指向这个独立 Gateway：
+
+```json
+{
+  "server": {
+    "bot_api_url": "http://127.0.0.1:18790",
+    "bot_gateway_token": "<bot.gateway.token>"
+  }
+}
+```
+
+`server.bot_api_url` 非空且未启用 `server.with_bot` 时进入外部模式：服务端只代理，不启动也不重启 Gateway。机器管理接口只接受 loopback 请求，因此两者需在同一台主机。
+
 ### 3. 让 `ov` CLI 使用 Gateway
 
 编辑 `~/.openviking/ovcli.conf`：
