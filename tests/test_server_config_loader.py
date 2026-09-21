@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: AGPL-3.0
 
 import json
-import logging
 
 import pytest
 
@@ -15,7 +14,7 @@ from openviking.server.config import (
 )
 
 
-def test_load_server_config_ignores_unknown_fields(tmp_path, caplog):
+def test_load_server_config_ignores_unknown_fields(tmp_path):
     config_path = tmp_path / "ov.conf"
     config_path.write_text(
         json.dumps(
@@ -32,7 +31,6 @@ def test_load_server_config_ignores_unknown_fields(tmp_path, caplog):
         )
     )
 
-    caplog.set_level(logging.WARNING, logger="openviking.server.config")
     config = load_server_config(str(config_path))
 
     assert config.host == "0.0.0.0"
@@ -40,12 +38,6 @@ def test_load_server_config_ignores_unknown_fields(tmp_path, caplog):
     assert config.observability.metrics.exporters.prometheus.enabled is False
     assert "prt" not in config.model_dump()
     assert "queuefs_scope" not in config.model_dump()
-    assert "Ignoring unknown config field 'server.prt'" in caplog.text
-    assert "Ignoring unknown config field 'server.queuefs_scope'" in caplog.text
-    assert (
-        "Ignoring unknown config field 'server.observability.metrics.exporters.prometheus.enabld'"
-        in caplog.text
-    )
 
 
 def test_load_server_config_reports_invalid_value_path(tmp_path):

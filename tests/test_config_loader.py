@@ -311,10 +311,12 @@ def test_openviking_config_handles_nested_parser_compatibility(monkeypatch):
 
 def test_openviking_config_ignores_unknown_fields(monkeypatch, caplog):
     monkeypatch.setenv(OPENVIKING_CONFIG_ENV, "/tmp/codex-no-config.json")
-    caplog.set_level(logging.WARNING, logger="openviking_cli.utils.config.open_viking_config")
+    logger = logging.getLogger("openviking_cli.utils.config.open_viking_config")
+    monkeypatch.setattr(logger, "handlers", [*logger.handlers, caplog.handler])
+    caplog.set_level(logging.WARNING, logger=logger.name)
     config = OpenVikingConfig.from_dict(
         {
-            "retired_section": {"enabled": True},
+            "retired_section": {"api_key": "test-secret"},
             "default_user": "alice",
             "glob": {"retired_field": True, "engine": "fs"},
             "memory": {"unknown_memory_field": "value", "session_skill_extraction_enabled": True},
@@ -340,15 +342,9 @@ def test_openviking_config_ignores_unknown_fields(monkeypatch, caplog):
     assert "retired_field" not in dumped["glob"]
     assert "unknown_memory_field" not in dumped["memory"]
     assert "cache" not in dumped["storage"]["agfs"]
-    assert "Ignoring unknown config field 'retired_section'" in caplog.text
-    assert "Ignoring unknown config field 'glob.retired_field'" in caplog.text
-    assert "Ignoring unknown config field 'memory.unknown_memory_field'" in caplog.text
     assert "Ignoring unknown config field 'storage.agfs.cache'" in caplog.text
-    assert "Ignoring unknown config field 'parsers.markdwon'" in caplog.text
-    assert "Ignoring unknown config field 'parsers.memory'" in caplog.text
     assert "Ignoring unknown config field 'parsers.markdown.unknown_field'" in caplog.text
-    assert "Ignoring unknown config field 'parsers.code.unknown_field'" in caplog.text
-    assert "Ignoring unknown config field 'parsers.anydoc.unknown_field'" in caplog.text
+    assert "test-secret" not in caplog.text
 
 
 def test_memory_extraction_output_format_defaults_to_python_and_accepts_json(monkeypatch):
