@@ -1,39 +1,48 @@
-import { fileURLToPath } from "node:url";
+// Build the OpenViking MCP mount config for DSH.
+//
+// DSH's MCP bridge natively supports `streamable-http` against the server's
+// /mcp endpoint, and the harness already runs in-process, so we reach that
+// endpoint from the plugin instead of spawning a stdio child that would just
+// re-bridge the same URL through fetch. The shape produced here is the one
+// `@deepseek-ai/dsh-mcp-client`'s zod union validates, so a drift in either
+// side fails at mount instead of silently breaking the tool surface.
+//
+// To keep wire parity with the stdio child this replaces, every value the
+// proxy forwarded is derived here through the same shared mappers: URL
+// normalization, identity headers, actor-peer gating, and reserved-header
+// filtering of OPENVIKING_EXTRA_HEADERS. Recalling those helpers from the
+// memory-plugin-shared override is deliberate: it stays the single authority
+// for "how a resolved harness config maps to a wire request", so adding a
+// new MCP integration later won't drift from this one.
 
+import { buildOvHeaders } from "./shared/ov-http.mjs";
+import { toMcpProxyConfig } from "./shared/mcp-proxy-config.mjs";
 import { MCP_SERVER_NAME } from "./config.mjs";
-import { forwardConnectionEnv } from "./shared/mcp-proxy-config.mjs";
 
-/** The same stdio proxy every other OpenViking memory integration starts. */
-export const PROXY_PATH = fileURLToPath(new URL("./servers/mcp-proxy.mjs", import.meta.url));
-
-/**
- * Build the dsh-mcp-client config for the OpenViking stdio proxy.
- *
- * DSH scrubs credential-shaped names out of the environment a subprocess
- * inherits, and the Cordis patch is invisible to one, so the proxy cannot
- * resolve the connection the way this process did. It gets the answer instead:
- * the resolved connection, diagnostics, and this session's peer, forwarded
- * with the forced `env` source so the child reads no file and lands on exactly
- * these values — the empty ones included.
- */
 export function buildMcpConfig(config) {
-  // In DSH Desktop, process.execPath is Electron's executable rather than a
-  // standalone Node binary. This tells Electron to run the proxy script as
-  // Node instead of attempting to launch a second Desktop instance.
-  const env = {
-    ELECTRON_RUN_AS_NODE: "1",
-    ...forwardConnectionEnv(config),
-    OPENVIKING_DEBUG: config.debug ? "1" : "0",
-    OPENVIKING_DEBUG_LOG: config.debugLogPath || "",
-  };
-  if (config.recallPeerScope) env.OPENVIKING_RECALL_PEER_SCOPE = config.recallPeerScope;
-  if (config.timeoutMs) env.OPENVIKING_TIMEOUT_MS = String(config.timeoutMs);
+  const connection = toMcpProxyConfig(config, {
+    env: process.env,
+  });
+
+  // `toMcpProxyConfig` runs `resolveMcpActorPeerId` when `peerId` is left
+  // undefined: the actor header goes out only when the caller opted into actor
+  // recall. `parseExtraHeaders` already dropped any reserved names from
+  // `connection.extraHeaders`, so merging opExtras under `built` here can only
+  // disagree on X-OpenViking-* or User-Agent — and `built` is the version the
+  // stdio child sent on the wire.
+  const built = buildOvHeaders(connection, {
+    actorPeerId: connection.peerId,
+  });
+  const opExtras = connection.extraHeaders;
+  const headers = opExtras && typeof opExtras === "object"
+    ? { ...opExtras, ...built }
+    : built;
+
   return {
-    transport: "stdio",
+    transport: "streamable-http",
     serverName: MCP_SERVER_NAME,
-    command: process.execPath,
-    args: [PROXY_PATH],
-    env,
+    url: connection.mcpUrl,
+    headers,
     toolCallTimeoutMs: config.mcpToolCallTimeoutMs,
   };
 }

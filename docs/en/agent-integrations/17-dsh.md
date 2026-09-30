@@ -53,7 +53,7 @@ After using it for a while, start a new conversation and ask about something you
 
 Start `dsh --profile web` and open a conversation. You should see an OpenViking context injection at the top of the session, and the model should have `mcp__openviking__*` tools available. Ask it about something from an earlier session to confirm recall.
 
-For MCP proxy diagnostics, set `OPENVIKING_DEBUG=1` and `OPENVIKING_DEBUG_LOG=/tmp/ov-dsh.log` before starting DSH, then check that file. Automatic memory callbacks use DSH's own logger. The legacy `OV_DEBUG_LOG=/tmp/ov-dsh.log` alias is still supported and takes precedence over both canonical settings.
+For runtime diagnostics, set `OPENVIKING_DEBUG=1` and `OPENVIKING_DEBUG_LOG=/tmp/ov-dsh.log` before starting DSH, then check that file. MCP tool calls go through DSH's host logger; their transport shows up there. Automatic memory callbacks use DSH's own logger.
 
 ## How it works
 
@@ -61,7 +61,7 @@ The bundle runs inside DSH as a Cordis plugin rather than as external hooks, so 
 
 Each DSH session maps to `dsh-<session-id>` in OpenViking, and every subagent gets its own session.
 
-The model-facing surface is the OpenViking MCP tool set, reached through the same stdio proxy the other memory integrations use and published under an `mcp__openviking__` prefix. Because that proxy runs once per profile, `mcp__openviking__remember` stores into a short-lived server-side session rather than the current one—automatic capture still records the conversation itself—and tool calls carry the actor peer resolved at startup. Set `OPENVIKING_PEER_ID` when one process serves several workspaces and tool calls need exact attribution. The bundle also ships two shared skills: `openviking-memory`, so the model knows when to search, read, and write, and `openviking-skills`, which covers finding, using, creating, sharing, and migrating skills stored in OpenViking.
+The model-facing surface is the OpenViking MCP tool set, reached directly from the DSH process over `streamable-http` against the server's `/mcp` endpoint and published under an `mcp__openviking__` prefix. Because the bridge is mounted once for the lifetime of the host, `mcp__openviking__remember` stores into a short-lived server-side session rather than the current one—automatic capture still records the conversation itself—and tool calls carry the actor peer resolved at startup. Set `OPENVIKING_PEER_ID` when one process serves several workspaces and tool calls need exact attribution. The bundle also ships two shared skills: `openviking-memory`, so the model knows when to search, read, and write, and `openviking-skills`, which covers finding, using, creating, sharing, and migrating skills stored in OpenViking.
 
 A filesystem tool call whose path is a `viking://` URI is blocked with a hint pointing at the right OpenViking tool. For a write or edit under a skill directory such as `viking://~/skills/<name>/`, that tool is `mcp__openviking__add_skill`, which creates or replaces a whole skill from its `SKILL.md` text. A shell command that carries a `viking://` URI still runs, and the model gets a notice suggesting the OpenViking tools, which it can ignore when the URI is intentional data.
 
@@ -78,9 +78,8 @@ Credentials resolve from `OPENVIKING_*` environment variables, then `~/.openviki
 | `OPENVIKING_PEER_ID` | — | Explicit actor peer |
 | `OPENVIKING_WORKSPACE_PEER` | `true` | Derive a peer from each session's workspace; `0` sends no peer |
 | `OPENVIKING_RECALL_PEER_SCOPE` | `all` | `actor` isolates recall to the current workspace |
-| `OPENVIKING_DEBUG` | `false` | Enable MCP proxy debug logging; also requires a log path |
-| `OPENVIKING_DEBUG_LOG` | `""` | File path for MCP proxy debug logs |
-| `OV_DEBUG_LOG` | — | Legacy alias: enables MCP proxy logging and overrides the canonical debug flag and log path |
+| `OPENVIKING_DEBUG` | `false` | Enable runtime debug logging (also requires a log path) |
+| `OPENVIKING_DEBUG_LOG` | `""` | Runtime debug log file path |
 
 Behavior knobs live in the profile's Cordis patch entry:
 

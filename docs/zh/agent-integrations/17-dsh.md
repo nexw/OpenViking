@@ -53,7 +53,7 @@ bash <(curl -fsSL https://ovrelease.tos-cn-beijing.volces.com/memory-plugin-shar
 
 启动 `dsh --profile web` 打开一个会话，会话开头应该能看到一条 OpenViking 上下文注入，模型也应该具备 `mcp__openviking__*` 工具。问一句更早会话里聊过的事，确认召回生效。
 
-排查 MCP 代理问题时，在启动 DSH 前设置 `OPENVIKING_DEBUG=1` 和 `OPENVIKING_DEBUG_LOG=/tmp/ov-dsh.log`，然后查看该文件。自动记忆回调使用 DSH 自身的日志系统。旧别名 `OV_DEBUG_LOG=/tmp/ov-dsh.log` 仍然支持，并且优先于这两个规范配置项。
+自动记忆回调使用 DSH 自身的日志系统。MCP bridge 工具调用通过 DSH host 自身的日志输出；运行时调试请使用 `OPENVIKING_DEBUG_LOG=/tmp/ov-dsh.log` 并查看该文件。
 
 ## 工作方式
 
@@ -61,7 +61,7 @@ bash <(curl -fsSL https://ovrelease.tos-cn-beijing.volces.com/memory-plugin-shar
 
 每个 DSH 会话映射为 OpenViking 中的 `dsh-<session-id>`，子 agent 各自拥有独立会话。
 
-模型看到的工具面就是 OpenViking 的 MCP 工具集，经由与其他记忆集成相同的 stdio 代理接入，以 `mcp__openviking__` 前缀发布。由于该代理每个 profile 只起一个进程，`mcp__openviking__remember` 写入的是服务端一个短生命周期的会话而不是当前会话（对话本身仍由自动捕获记录），工具调用带的也是启动时解析的 actor peer。若一个进程要服务多个工作区且需要精确归属工具调用，请显式设置 `OPENVIKING_PEER_ID`。插件同时附带两个共享技能：`openviking-memory` 让模型知道何时该检索、读取和写入，`openviking-skills` 讲如何查找、使用、创建、共享和迁移存放在 OpenViking 里的技能。
+模型看到的工具面就是 OpenViking 的 MCP 工具集，以 `mcp__openviking__` 前缀发布。由于 bridge 是在 DSH 进程内直连 `/mcp`，`mcp__openviking__remember` 写入的是服务端一个短生命周期的会话而不是当前会话（对话本身仍由自动捕获记录），工具调用带的也是启动时解析的 actor peer。若一个进程要服务多个工作区且需要精确归属工具调用，请显式设置 `OPENVIKING_PEER_ID`。插件同时附带两个共享技能：`openviking-memory` 让模型知道何时该检索、读取和写入，`openviking-skills` 讲如何查找、使用、创建、共享和迁移存放在 OpenViking 里的技能。
 
 文件工具误把 `viking://` URI 当本地路径时，调用会被拦截，并提示改用对应的 OpenViking 工具；写入或编辑的若是 `viking://~/skills/<name>/` 这类技能目录，提示的工具是 `mcp__openviking__add_skill`，它用完整的 `SKILL.md` 文本创建或替换整个技能。shell 命令带 `viking://` URI 时照常执行，模型会收到一条改用 OpenViking 工具的提示，URI 是有意传入的数据时可以忽略。
 
@@ -78,9 +78,8 @@ bash <(curl -fsSL https://ovrelease.tos-cn-beijing.volces.com/memory-plugin-shar
 | `OPENVIKING_PEER_ID` | — | 显式指定 actor peer |
 | `OPENVIKING_WORKSPACE_PEER` | `true` | 按每个会话的工作区推导 peer；设为 `0` 则不发送 peer |
 | `OPENVIKING_RECALL_PEER_SCOPE` | `all` | 设为 `actor` 可将召回限制在当前工作区 |
-| `OPENVIKING_DEBUG` | `false` | 启用 MCP 代理调试日志；还需配置日志路径 |
-| `OPENVIKING_DEBUG_LOG` | `""` | MCP 代理调试日志的文件路径 |
-| `OV_DEBUG_LOG` | — | 旧别名：启用 MCP 代理日志，并覆盖规范的调试开关和日志路径 |
+| `OPENVIKING_DEBUG` | `false` | 启用运行时调试日志（需同时指定 `OPENVIKING_DEBUG_LOG`） |
+| `OPENVIKING_DEBUG_LOG` | `""` | 运行时调试日志文件路径 |
 
 行为参数写在 profile 的 Cordis patch 条目里：
 

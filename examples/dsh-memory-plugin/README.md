@@ -118,25 +118,22 @@ reaches `request/header`.
 
 ### How the tool surface is mounted
 
-`mcp.mjs` mounts `@deepseek-ai/dsh-mcp-client` on `servers/mcp-proxy.mjs`, the
-same stdio proxy every other OpenViking memory integration starts, so the model
-gets the server's full tool set instead of a hand-maintained subset and the
-transport behaves identically across harnesses. Pointing the bridge straight at
-the server's `/mcp` endpoint does not work: with `stateless_http=True` the
-server still answers `GET /mcp` with an idle 200 SSE stream, and once the MCP
-SDK client opens that standalone stream it stops resolving POST responses, so
-`tools/list` never returns. The proxy owns the transport itself and is
-unaffected.
+`mcp.mjs` mounts `@deepseek-ai/dsh-mcp-client` against the server's `/mcp`
+endpoint with `transport: "streamable-http"`. DSH ships the bridge itself and
+the plugin already lives inside the DSH process, so the transport is reached
+directly — no per-profile stdio child, no env round-trip. The mount still
+passes through the same shared mappers every other integration uses for
+connection shape (`toMcpProxyConfig`) and header construction
+(`buildOvHeaders`), so URL normalization, identity headers, actor-peer gating,
+and `OPENVIKING_EXTRA_HEADERS` filtering stay a single authority.
 
-The bundle's resolved connection — url, MCP url, key, account, user and auth
-mode — travels to the proxy through the child environment, because DSH scrubs
-credential-shaped names out of the inherited env and a subprocess cannot see the
-Cordis patch. It goes with `OPENVIKING_CREDENTIAL_SOURCE=env`, so the proxy reads
-no config file and reaches the server exactly as the runtime does, including
-with no key when the runtime has none. A changed `ovcli.conf` therefore takes
-effect for the tools when DSH restarts the bundle, as it does for the runtime.
+The bundle's resolved connection — url, key, account, user and auth mode —
+feeds the bridge's requestInit directly, so the tools talk to the server
+exactly as the runtime does, including with no key when the runtime has none.
+A changed `ovcli.conf` therefore takes effect for the tools when DSH
+restarts the bundle, as it does for the runtime.
 
-Two consequences follow from the proxy being one process per profile:
+Two consequences follow from the mount being process-level:
 
 - **MCP actor scope is process-level.** With the default `recallPeerScope: all`, MCP tool calls omit the actor peer header. With `actor`, they use the peer resolved at boot. Automatic recall, capture, and commit resolve their peer from each session's workspace.
 - **`remember` is not session-scoped.** The server's MCP `remember` stores into
@@ -145,7 +142,9 @@ Two consequences follow from the proxy being one process per profile:
   Automatic capture still records the conversation itself.
 
 The bridge and the skill provider are mounted last in `apply()`, after every
-lifecycle registration, so a proxy that cannot start holds up nothing above it.
+lifecycle registration, so a mount that fails to start holds up nothing above
+it. `failOnStartupError: false` keeps recall, capture, and commit working
+against a server whose MCP endpoint is unreachable.
 
 ### Why the skill gets its own provider
 
