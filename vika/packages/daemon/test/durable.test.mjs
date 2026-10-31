@@ -8,7 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { describe, it } from 'node:test';
-import { DURABLE_VERSION, DURABLE_HOST } from '../src/durable-runtime.mjs';
+import { DURABLE_VERSION, DURABLE_HOST, sanitizeDurableEnv } from '../src/durable-runtime.mjs';
+import { availableChatModels, loadDurableModels, piDefaultModel } from '../src/durable-models.mjs';
 import { DurableAgent } from '../src/durable.mjs';
 
 const quietLogger = { debug() {}, info() {}, warn() {}, error() {}, child() { return this; } };
@@ -512,6 +513,48 @@ describe('DurableAgent against the real host', () => {
     }
   });
 
+  it('runs commands and edits workspace files through the coding tools', async () => {
+    const dataDir = tempDir();
+    const config = baseConfig({ dataDir });
+    const workspace = config.workspace;
+    const store = makeStore();
+    const successes = [];
+    const agent = new DurableAgent(config, store, quietLogger, {
+      onTurnSucceeded: (success) => successes.push(success),
+    });
+    process.env.DURABLE_FAUX = '1';
+    process.env.DURABLE_FAUX_RESPONSES = JSON.stringify([
+      { toolCall: { name: 'bash', arguments: { command: 'printf hello > note.txt && cat note.txt' } } },
+      { toolCall: { name: 'read', arguments: { path: 'note.txt' } } },
+      { toolCall: { name: 'write', arguments: { path: 'draft.txt', content: 'first' } } },
+      { toolCall: { name: 'edit', arguments: { path: 'draft.txt', edits: [{ oldText: 'first', newText: 'second' }] } } },
+      { text: 'done' },
+    ]);
+    try {
+      await agent.start();
+      agent.deliver('do local work', 7);
+      await waitFor(() => successes.length === 1, 20_000);
+      // The coding tools share the run's NodeExecutionEnv, so relative paths
+      // land in the configured workspace, not the host's own directory.
+      assert.equal(fs.readFileSync(path.join(workspace, 'note.txt'), 'utf8'), 'hello');
+      assert.equal(fs.readFileSync(path.join(workspace, 'draft.txt'), 'utf8'), 'second');
+      const called = store.activities
+        .filter((activity) => activity.kind === 'agent.tool_called')
+        .map((activity) => activity.summary);
+      assert.deepEqual(called, ['bash', 'read', 'write', 'edit']);
+      const completed = store.activities.filter((activity) => activity.kind === 'agent.tool_completed');
+      assert.equal(completed.length, 4);
+      // A missing tool would settle as a completed error result, which is how
+      // this surfaced: the turn succeeded while every local call failed.
+      assert.deepEqual(completed.map((activity) => activity.status), ['COMPLETED', 'COMPLETED', 'COMPLETED', 'COMPLETED']);
+    } finally {
+      await agent.stop();
+      delete process.env.DURABLE_FAUX;
+      delete process.env.DURABLE_FAUX_RESPONSES;
+      fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it('resumes a turn the host was killed in the middle of', async () => {
     const dataDir = tempDir();
     const config = baseConfig({ dataDir });
@@ -548,5 +591,58 @@ describe('DurableAgent against the real host', () => {
       delete process.env.DURABLE_FAUX_RESPONSES;
       fs.rmSync(dataDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('durable model configuration', () => {
+  it('reads the providers, logins and default model Pi uses', async () => {
+    const agentDir = tempDir();
+    fs.writeFileSync(path.join(agentDir, 'models.json'), JSON.stringify({
+      providers: {
+        'volcengine-ark': {
+          baseUrl: 'https://ark.example.invalid/api/v3',
+          api: 'openai-completions',
+          models: [{ id: 'ep-test', reasoning: true }],
+        },
+      },
+    }));
+    fs.writeFileSync(path.join(agentDir, 'auth.json'), JSON.stringify({
+      'volcengine-ark': { type: 'api_key', key: 'ark-test-key' },
+    }));
+    fs.writeFileSync(path.join(agentDir, 'settings.json'), JSON.stringify({
+      defaultProvider: 'volcengine-ark',
+      defaultModel: 'ep-test',
+    }));
+    const saved = process.env.PI_CODING_AGENT_DIR;
+    process.env.PI_CODING_AGENT_DIR = agentDir;
+    try {
+      assert.equal(piDefaultModel(), 'volcengine-ark/ep-test');
+      const { models } = await loadDurableModels();
+      const chat = await availableChatModels(models);
+      // A model configured in Pi is a model the durable runtime can run, and
+      // Pi's default is what an unset VIKA_DURABLE_MODEL resolves to.
+      assert.equal(chat[0].provider, 'volcengine-ark');
+      assert.equal(chat[0].id, 'ep-test');
+    } finally {
+      if (saved === undefined) delete process.env.PI_CODING_AGENT_DIR;
+      else process.env.PI_CODING_AGENT_DIR = saved;
+      fs.rmSync(agentDir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps ARK_API_KEY for a models.json provider, like Pi does', () => {
+    // sanitizeAgentChildEnv strips VOLCENGINE_/ARK_ keys; a Pi provider may
+    // name ARK_API_KEY as its key, so the durable child keeps it too.
+    const safe = sanitizeDurableEnv({
+      PATH: '/usr/bin',
+      HOME: '/home/u',
+      ARK_API_KEY: 'ark-secret',
+      VOLCENGINE_API_KEY: 'volc-secret',
+      LARK_APP_SECRET: 'lark-secret',
+    }, 'profile-a');
+    assert.equal(safe.ARK_API_KEY, 'ark-secret');
+    assert.equal(safe.VOLCENGINE_API_KEY, undefined);
+    assert.equal(safe.LARK_APP_SECRET, undefined);
+    assert.equal(safe.LARKSUITE_CLI_PROFILE, 'profile-a');
   });
 });

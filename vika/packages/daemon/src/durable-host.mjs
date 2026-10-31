@@ -4,7 +4,8 @@
 // Durable runtime host. One process owns one pi-durable Harness over SQLite;
 // the daemon speaks JSON lines on stdin/stdout and never shares the model loop
 // or tool execution process. Chat replies go through the Core agent tools this
-// host registers from <dataDir>/actions.sock, exactly like the MCP adapter.
+// host registers from <dataDir>/actions.sock, exactly like the MCP adapter, and
+// local work goes through pi-durable's coding tools (bash, read, write, edit).
 //
 // Protocol v1 is documented in docs/pi-durable-runtime.md.
 
@@ -14,7 +15,6 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import { createModels, Type } from '@earendil-works/pi-ai';
-import { builtinModels } from '@earendil-works/pi-ai/providers/all';
 import {
   fauxAssistantMessage,
   fauxProvider,
@@ -30,6 +30,8 @@ import {
 } from '@earendil-works/pi-durable';
 import { openNodeSqliteStorage } from '@earendil-works/pi-durable/storage/sqlite/node';
 import { NodeExecutionEnv } from '@earendil-works/pi-durable/env/node';
+import { CodingTools } from '@earendil-works/pi-durable/tools';
+import { availableChatModels, loadDurableModels } from './durable-models.mjs';
 import { actionEndpoint, callTool, listTools } from './actions/client.mjs';
 import { DURABLE_PROTOCOL } from './durable-runtime.mjs';
 
@@ -111,10 +113,9 @@ class Host {
   }
 
   async availableModel() {
-    const available = await this.models.getAvailable();
-    const chat = available.filter((model) => (model.type ?? 'chat') === 'chat');
-    if (chat.length === 0) throw new Error('durable runtime has no model with configured credentials; set a provider API key (for example OPENAI_API_KEY) or VIKA_DURABLE_MODEL');
-    return { provider: chat[0].provider, modelId: chat[0].id };
+    const [first] = await availableChatModels(this.models);
+    if (!first) throw new Error('durable runtime has no model with configured credentials; configure one in Pi (vika pi, then /login, or ~/.pi/agent/models.json) or set a provider API key such as OPENAI_API_KEY');
+    return { provider: first.provider, modelId: first.id };
   }
 
   async resolveAgent() {
@@ -126,7 +127,7 @@ class Host {
     return { model, thinkingLevel: effort, cwd: this.workspace };
   }
 
-  buildModels() {
+  async buildModels() {
     if (process.env.DURABLE_FAUX === '1') {
       const models = createModels();
       const faux = fauxProvider({ models: [{ id: 'faux-model', reasoning: true }] });
@@ -135,7 +136,11 @@ class Host {
       this.scripted();
       return models;
     }
-    return builtinModels();
+    const { models, error } = await loadDurableModels();
+    // A broken models.json leaves the built-in providers; say why Pi's are
+    // missing instead of listing a runtime that only looks unusable here.
+    if (error) log({ type: 'pi_models_error', error });
+    return models;
   }
 
   scripted() {
@@ -341,7 +346,7 @@ class Host {
 
     fs.mkdirSync(path.join(this.dataDir, 'durable'), { recursive: true, mode: 0o700 });
     this.nativeSessionId = Number.isSafeInteger(nativeSessionId) ? nativeSessionId : null;
-    this.models = this.buildModels();
+    this.models = await this.buildModels();
     const tools = await this.buildTools();
     const registry = createRegistry();
     registry.install(defineExtension({
@@ -349,6 +354,11 @@ class Host {
       sections: [section('policy', () => this.policy, { tag: false })],
       tools,
     }));
+    // The policy promises local work ("run commands and write files in the
+    // configured workspace"), and a delivery body may be a file in it. The
+    // coding tools resolve their cwd from the same per-run NodeExecutionEnv as
+    // the Core tools, so nothing else is wired here.
+    registry.install(CodingTools);
     const storage = await openNodeSqliteStorage(this.storagePath());
     const env = ({ cwd }) => new NodeExecutionEnv({ cwd: cwd ?? this.workspace });
     this.harness = await Harness.open(storage, { models: this.models, registry, env }, context);
@@ -418,10 +428,9 @@ class Host {
   }
 
   async listModels() {
-    const available = await this.models.getAvailable();
+    const available = await availableChatModels(this.models);
     return {
       models: available
-        .filter((model) => (model.type ?? 'chat') === 'chat')
         .map((model) => ({
           id: `${model.provider}/${model.id}`,
           efforts: model.reasoning ? [...EFFORTS] : ['off'],
