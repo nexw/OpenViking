@@ -1,7 +1,9 @@
 // Copyright (c) 2026 Beijing Volcano Engine Technology Co., Ltd.
 // SPDX-License-Identifier: AGPL-3.0
 
-import { spawn } from 'node:child_process';
+import { spawnDetached } from './platform/index.mjs';
+
+import { spawn } from './platform/index.mjs';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -239,7 +241,7 @@ export class LarkClient {
       cwd: this.config.projectDir,
       env: sanitizeNonArkChildEnv(process.env),
       shell: false,
-      detached: this.config.connectorWorker ? false : process.platform !== 'win32',
+      detached: this.config.connectorWorker ? false : spawnDetached,
       stdio: ['ignore', 'pipe', 'pipe'],
     }));
     this.subscriber = child;
@@ -500,9 +502,11 @@ export class LarkClient {
     return { messages: messageList(data), has_more: Boolean(data.has_more) };
   }
 
-  async searchMessages({ query, chat_id: chatId, start, end, limit = 20 }) {
+  // As the owner by default; as the bot, the search covers only the chats it
+  // has joined (needs the app's own search:message).
+  async searchMessages({ query, chat_id: chatId, start, end, limit = 20, as = 'user' }) {
     const data = await this.im([
-      '+messages-search', '--as', 'user', '--query', query, '--page-size', String(limit), '--format', 'json',
+      '+messages-search', '--as', as, '--query', query, '--page-size', String(limit), '--format', 'json',
       ...(chatId ? ['--chat-id', chatId] : []), ...(start ? ['--start', start] : []), ...(end ? ['--end', end] : []),
     ], 'search messages');
     return { messages: messageList(data).slice(0, limit), has_more: Boolean(data.has_more) };

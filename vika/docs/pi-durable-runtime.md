@@ -63,23 +63,14 @@ model (`off` … `max` for reasoning models, `off` otherwise; default from
   a call goes to `POST /v1/call`, through the same authority, freshness and
   outbox checks as the MCP adapter of the other runtimes. Image media from a
   tool result (`get_message_media`) reaches the model as an image block, up to
-  10 MB. A host without the socket refuses to start.
-- **Coding tools.** pi-durable's `CodingTools` (`bash`, `read`, `write`, `edit`)
-  run in the instance workspace.
-- **OpenViking tools.** When the instance has an OpenViking connection
-  (`OPENVIKING_CLI_CONFIG_FILE`, or `OPENVIKING_URL` for a local server), the
-  host connects to the server's MCP endpoint through `@earendil-works/pi-mcp`
-  and registers its whole catalogue as `openviking_*` tools, exactly like the
-  official pi extension. The handshake runs in the background and never
-  delays a fresh start; a turn resumed after a crash waits for the first
-  handshake (bounded by its 5 s budget) so a replayed tool call finds the
-  catalogue. A failed or slow server leaves the session without OpenViking
-  tools but fully able to send and deliver (fail-open), and the next turn
-  retries at most once a minute. Calls carry the same identity headers as the
-  daemon's own OV connection plus the instance's actor peer, are bounded by a
-  15 s timeout, and never replay: read-only tools (`readOnlyHint`) may rerun
-  after a crash, write tools do not. `DURABLE_OV=0` keeps the host off
-  OpenViking entirely.
+  10 MB. A host without the socket refuses to start. When the instance has an
+  OpenViking connection, the `openviking_*` tools are part of that same list —
+  there is no Durable-specific OpenViking bridge, and a durable turn sees
+  exactly the tools the other local runtimes see.
+- **Coding tools.** `read`, `write`, and `edit` run in the instance workspace.
+  macOS/Linux use `bash`; Windows uses the upstream `powershell` tool, which
+  tries `pwsh` first and falls back to Windows PowerShell 5.1 on spawn failure.
+  No Bash installation is needed for Windows Durable. Other runtimes are unchanged.
 
 The child environment is sanitized like the other local runtimes: `LARK_*`,
 `FEISHU_*`, `LARKSUITE_*`, `VIKA_*`, `ARK_*` (except `ARK_API_KEY`) and

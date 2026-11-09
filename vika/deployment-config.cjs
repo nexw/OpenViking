@@ -4,6 +4,7 @@
 'use strict';
 
 const fs = require('node:fs');
+const { homeDir } = require('./packages/daemon/src/platform/index.mjs');
 const path = require('node:path');
 
 const INSTANCE_ID = /^[a-z][a-z0-9-]{0,31}$/;
@@ -27,12 +28,14 @@ const DAEMON_ENV_FIELDS = Object.freeze([
   'VIKA_DRY_RUN',
   'VIKA_IGNORED_SENDER_IDS',
   'VIKA_SEND_TIMEOUT_MS',
+  'VIKA_OV_TOOL_TIMEOUT_MS',
   'VIKA_SHUTDOWN_TIMEOUT_MS',
   'VIKA_MAX_REPLY_CHARS',
   'VIKA_MAX_EVENT_BYTES',
   'VIKA_MAX_EVENT_AGE_MS',
   'VIKA_IDLE_REACTION_AFTER_MS',
   'VIKA_TIMER_OCCURRENCE_CHECK_DELAY_MS',
+  'VIKA_TIMER_STORAGE',
   'VIKA_RETENTION_MS',
   'VIKA_CODEX_EFFORT',
   'VIKA_TRAEX_EFFORT',
@@ -78,6 +81,7 @@ const AGENT_FIELDS = Object.freeze([
   'channel',
   'connectors',
   'profile',
+  'larkMessageAccess',
   'port',
   'dataDir',
   'tempDir',
@@ -97,6 +101,9 @@ const AGENT_FIELDS = Object.freeze([
 // The roles shipped with the release (packages/daemon/agent/roles/<name>.md).
 // An instance names one of them, or the absolute path of its own role file.
 const ROLE_PRESETS = Object.freeze(['colleague', 'assistant', 'qa']);
+// agents[].larkMessageAccess: `owner` reads with the owner's visibility,
+// `bot` only in the chats the bot has joined.
+const LARK_MESSAGE_ACCESS = Object.freeze(['owner', 'bot']);
 // Each mailbox is its own email Connector instance; the id is how the model
 // and the logs tell them apart.
 const EMAIL_INSTANCE_ID = /^email-[a-z0-9][a-z0-9-]{0,39}$/;
@@ -111,7 +118,7 @@ function resolveDeploymentManifestPath(env = process.env) {
     }
     return path.normalize(override);
   }
-  const home = typeof env.HOME === 'string' ? env.HOME.trim() : '';
+  const home = typeof homeDir(env) === 'string' ? homeDir(env).trim() : '';
   if (!home || !path.isAbsolute(home)) throw new Error('HOME must be an absolute path');
   return path.join(path.normalize(home), '.vika', 'config.json');
 }
@@ -130,7 +137,7 @@ function resolveSecretsFilePath(env = process.env) {
     }
     return path.normalize(override);
   }
-  const home = typeof env.HOME === 'string' ? env.HOME.trim() : '';
+  const home = typeof homeDir(env) === 'string' ? homeDir(env).trim() : '';
   if (!home || !path.isAbsolute(home)) return null;
   return path.join(path.normalize(home), '.vika', 'secrets.env');
 }
@@ -278,6 +285,15 @@ function parseAgent(value, index, ignored) {
   if (!connectors.includes('lark') && value.profile !== undefined) {
     throw new Error(`${label}.profile is only used by the lark connector`);
   }
+  // Whose visibility Lark reads use: the owner's (search and history across
+  // their chats, the default) or only the bot's own chats. Chosen when the app
+  // is connected; the permissions it asks for follow it.
+  if (!connectors.includes('lark') && value.larkMessageAccess !== undefined) {
+    throw new Error(`${label}.larkMessageAccess is only used by the lark connector`);
+  }
+  if (value.larkMessageAccess !== undefined && !LARK_MESSAGE_ACCESS.includes(value.larkMessageAccess)) {
+    throw new Error(`${label}.larkMessageAccess must be ${LARK_MESSAGE_ACCESS.join(' or ')}`);
+  }
   if (value.ovAutoRecall !== undefined && typeof value.ovAutoRecall !== 'boolean') {
     throw new Error(`${label}.ovAutoRecall must be a boolean`);
   }
@@ -302,13 +318,16 @@ function parseAgent(value, index, ignored) {
     channel,
     connectors: Object.freeze(connectors),
     profile: connectors.includes('lark') ? manifestString(value.profile, `${label}.profile`) : null,
+    larkMessageAccess: connectors.includes('lark') ? value.larkMessageAccess ?? 'owner' : null,
     port: value.port,
     dataDir: manifestAbsolutePath(value.dataDir, `${label}.dataDir`),
     tempDir: value.tempDir == null ? null : manifestAbsolutePath(value.tempDir, `${label}.tempDir`),
     workspace: manifestAbsolutePath(value.workspace, `${label}.workspace`),
     ovConfig: manifestAbsolutePath(value.ovConfig, `${label}.ovConfig`),
     ovAutoRecall: value.ovAutoRecall ?? false,
-    explicitSilence: value.explicitSilence ?? false,
+    // On by default, except on Ark (no Core tools, so no stay_silent); an
+    // explicit false opts out.
+    explicitSilence: value.explicitSilence ?? model !== 'ark',
     stagedReplies: value.stagedReplies ?? false,
     role: manifestRole(value.role, `${label}.role`),
     naturalWriting: value.naturalWriting ?? true,
@@ -473,16 +492,37 @@ function selectDeploymentAgent(deployment, id = deployment.defaultInstance) {
   return agent;
 }
 
-// Pin the runtime plugins to this instance's OV identity and recall policy.
+// Vika owns OpenViking for the agents it runs: the daemon syncs the
+// conversation and shows memory (ov-session-context.mjs, ov-recall.mjs), and
+// the Core's openviking_* tools read and write it. The runtimes' own OpenViking
+// plugins stay out: each runtime switches them off where it is launched
+// (runtime-catalog.mjs, ovIsolation). These process variables are the second
+// line for a plugin that loads anyway: they pin it to this instance's identity
+// and keep it inert (no memory hooks, capture, recall, commit or takeover).
+// They are this instance's process variables only, ranked above every file, so
+// the owner's own Codex / Claude Code / Pi keep their settings.
+//
+// The plugins keep session state and a queue of unsent writes under the home
+// directory, shared by every process of the OS user, so even an inert plugin
+// gets its own directories under the instance's data directory.
 function openVikingAgentEnv(agent) {
+  const state = path.join(agent.dataDir, 'openviking');
   return {
     OPENVIKING_CLI_CONFIG_FILE: agent.ovConfig,
     OPENVIKING_CREDENTIAL_SOURCE: 'cli',
-    OPENVIKING_MEMORY_ENABLED: '1',
-    OPENVIKING_AUTO_RECALL: agent.ovAutoRecall ? '1' : '0',
-    OPENVIKING_AUTO_CAPTURE: '1',
-    OPENVIKING_AUTO_COMMIT_ON_COMPACT: '1',
-    OPENVIKING_RECALL_PEER_SCOPE: 'actor',
+    OPENVIKING_MEMORY_ENABLED: '0',
+    OPENVIKING_AUTO_RECALL: '0',
+    OPENVIKING_AUTO_CAPTURE: '0',
+    OPENVIKING_AUTO_COMMIT_ON_COMPACT: '0',
+    OPENVIKING_TAKEOVER: '0',
+    OPENVIKING_WORKSPACE_PEER: '0',
+    OPENVIKING_RECALL_PEER_SCOPE: 'all',
+    OPENVIKING_HOME: state,
+    OPENVIKING_STATE_DIR: path.join(state, 'state'),
+    OPENVIKING_HOOK_STATE_DIR: path.join(state, 'hook-state'),
+    OPENVIKING_CODEX_STATE_DIR: path.join(state, 'codex-plugin-state'),
+    OPENVIKING_PENDING_DIR: path.join(state, 'pending'),
+    OPENVIKING_RECALL_LEDGER_DIR: path.join(state, 'recall-ledger'),
   };
 }
 
@@ -504,12 +544,15 @@ function applyDeploymentAgentEnv(env, deployment, requestedId) {
   if (agent.profile) {
     env.VIKA_LARK_PROFILE = agent.profile;
     env.LARKSUITE_CLI_PROFILE = agent.profile;
+    env.VIKA_LARK_MESSAGE_ACCESS = agent.larkMessageAccess;
   } else {
     delete env.VIKA_LARK_PROFILE;
     delete env.LARKSUITE_CLI_PROFILE;
+    delete env.VIKA_LARK_MESSAGE_ACCESS;
   }
   Object.assign(env, openVikingAgentEnv(agent));
   // Always set, so neither the shell nor another instance's value leaks in.
+  env.VIKA_OV_AUTO_RECALL = agent.ovAutoRecall ? 'true' : 'false';
   env.VIKA_EXPLICIT_SILENCE = agent.explicitSilence ? 'true' : 'false';
   env.VIKA_NATURAL_WRITING = agent.naturalWriting ? 'true' : 'false';
   env.VIKA_STAGED_REPLIES = agent.stagedReplies ? 'true' : 'false';

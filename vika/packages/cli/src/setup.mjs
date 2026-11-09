@@ -1,6 +1,10 @@
 // Copyright (c) 2026 Beijing Volcano Engine Technology Co., Ltd.
 // SPDX-License-Identifier: AGPL-3.0
 
+import { capabilities } from '../../daemon/src/capabilities.mjs';
+
+import { expandHome as platformExpandHome } from '../../daemon/src/platform/index.mjs';
+
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -19,8 +23,8 @@ import {
   ROLE_PRESETS, WEB_PORT, allocatePort, availableInstanceOvConfig, instanceIdProblem, readManifest, suggestInstanceId, validateManifest, vikaCommand,
   vikaHome, withChangedInstance, withDefaultTempDir, withInstance, writeManifest,
 } from './manifest.mjs';
-import { detectOpenViking, writeInstanceOvConfig } from './ov.mjs';
-import { configureOpenViking, prepareInstanceOpenViking, saveOVConnection } from './ov-setup.mjs';
+import { OVRegistrations, detectOpenViking, instanceOvConfig, writeInstanceOvConfig } from './ov.mjs';
+import { configureOpenViking, prepareInstanceOpenViking, saveOVConnection, takenIdentities } from './ov-setup.mjs';
 import { detectRuntimes, which } from './runtimes.mjs';
 import { showScan } from './qr.mjs';
 import { restartCommand, startCommand } from './control.mjs';
@@ -52,17 +56,30 @@ function resolveLarkCli(env) {
   return bundled === 'lark-cli' ? which('lark-cli', env) : bundled;
 }
 
-export function expandHome(value, homeDir = os.homedir()) {
-  return value === '~' ? homeDir : value.replace(/^~(?=\/)/, homeDir);
-}
+export function expandHome(value, homeDir = os.homedir()) { return platformExpandHome(value, homeDir); }
 
 function shortenHome(value, homeDir) {
   return value.startsWith(`${homeDir}${path.sep}`) ? path.join('~', path.relative(homeDir, value)) : value;
 }
 
-export function larkScopes() {
+// The user scopes that read messages with the owner's visibility: their
+// history in any chat and search across all of them. Once the owner has
+// granted them to an app, Feishu/Lark keeps them for it: taking them off the
+// app later stops history reads but not search.
+export const OWNER_MESSAGE_SCOPES = Object.freeze([
+  'search:message', 'im:message:readonly', 'im:message.group_msg:get_as_user', 'im:message.p2p_msg:get_as_user',
+]);
+
+// What the app and the owner's login ask for. `bot` (larkMessageAccess):
+// none of OWNER_MESSAGE_SCOPES, and search as the bot instead, which covers
+// only the chats the bot has joined.
+export function larkScopes(access = 'owner') {
   const { scopes } = JSON.parse(fs.readFileSync(PERMISSIONS, 'utf8'));
-  return { tenant: scopes.tenant, user: scopes.user };
+  if (access !== 'bot') return { tenant: scopes.tenant, user: scopes.user };
+  return {
+    tenant: [...scopes.tenant, 'search:message'],
+    user: scopes.user.filter((scope) => !OWNER_MESSAGE_SCOPES.includes(scope)),
+  };
 }
 
 const imChoices = () => [
@@ -76,7 +93,7 @@ const imChoices = () => [
     hint: t('工作区里的 Slack App（新建或用已有的，Socket Mode）；需要粘贴两个 token', 'a new or existing app in your Slack workspace (Socket Mode); paste two tokens') },
   { label: 'QQ', value: 'qq',
     hint: t('腾讯官方机器人；需要 AppID / AppSecret 和本人私聊验证码', 'official Tencent bot; needs AppID / AppSecret and a private-chat verification code') },
-];
+].filter(choice => capabilities.connectors[choice.value] !== false);
 
 // IMs connected by pasting tokens rather than scanning a code.
 const TOKEN_IMS = ['telegram', 'slack', 'qq'];
@@ -95,6 +112,25 @@ const larkSources = () => [
       'when a scan cannot be used (not an owner or administrator, a test tenant); what the app lacks is added in the developer console') },
 ];
 
+// Whose visibility the bot reads with, asked for each app before its scans:
+// the permissions differ. What the owner grants an app stays with it, so the
+// choice is not offered again for the same app.
+const larkAccessChoices = () => [
+  { value: 'owner', label: t('允许', 'Allow'),
+    hint: t('能搜索和读取你在飞书里看得到的全部消息，包括它不在的群和你的单聊；授权后飞书不会收回，这个机器人以后改不回来',
+      'it can search and read every message you can see on Feishu/Lark, its chats or not, your direct chats too; Feishu/Lark keeps the grant, so this bot cannot be changed back later') },
+  { value: 'bot', label: t('不允许，只看它所在的会话', 'No, only the chats it is in'),
+    hint: t('搜索和读取都只限它加入的群和它的单聊', 'search and reading stay within the groups it has joined and its own direct chats') },
+];
+
+const larkAccessShown = (access) => (access === 'bot' ? t('只看它所在的会话', 'only the chats it is in') : null);
+
+async function askLarkAccess(prompter, initial) {
+  const choices = larkAccessChoices();
+  return prompter.select(t('允许机器人以你的身份搜索和读取飞书消息？', 'Let the bot search and read Feishu/Lark messages as you?'), choices,
+    { initial: Math.max(0, choices.findIndex(({ value }) => value === initial)), label: t('以你的身份读消息', 'Reads as you') });
+}
+
 // How the instance gets its Feishu/Lark app: `keep` the one it has, or one
 // of larkSources. None without Feishu.
 function larkSource(state, current) {
@@ -106,6 +142,12 @@ function larkSource(state, current) {
 // The app as the settings list and the summaries show it; `needs` is what
 // the current app lacks of this release (larkNeeds), when it lacks anything.
 function larkAppShown(state, current, needs = null) {
+  const access = larkAccessShown(state.larkApp?.access);
+  return access ? t(`${larkAppSource(state, current, needs)}（${access}）`, `${larkAppSource(state, current, needs)} (${access})`)
+    : larkAppSource(state, current, needs);
+}
+
+function larkAppSource(state, current, needs) {
   const source = larkSource(state, current);
   if (source === 'manual' && state.larkApp?.app) return t(`应用 ${state.larkApp.app.appId}`, `the app ${state.larkApp.app.appId}`);
   if (source === 'keep' && state.larkRepair) {
@@ -230,7 +272,7 @@ function initialState({ id, env, homeDir, current, runtimes, kept }) {
     connectors,
     channel: current?.channel ?? connectors[0],
     ovConfig: current?.ovConfig,
-    switches: Object.fromEntries(Object.entries(SWITCH_DEFAULTS).map(([key, value]) => [key, current?.[key] ?? value])),
+    switches: Object.fromEntries(Object.keys(SWITCH_DEFAULTS).map((key) => [key, current?.[key] ?? switchDefault(key, current?.model)])),
     larkApp: null,
     mail: { kept: current ? mailboxesOf(current) : [], added: [], updated: new Map(), removed: [] },
   };
@@ -438,12 +480,16 @@ async function askLarkApp(ctx, state) {
     const source = await prompter.select(t('飞书机器人', 'Feishu/Lark bot'), choices,
       { initial: Math.max(0, choices.findIndex(({ value }) => value === chosen)) });
     state.larkRepair = source === 'repair';
-    if (source !== 'manual') {
-      state.larkApp = ['keep', 'repair'].includes(source) ? null : { source };
+    if (['keep', 'repair'].includes(source)) {
+      state.larkApp = null;
       break;
     }
+    // A new app: typed in, or one to scan; then whose visibility it reads
+    // with, which decides what both scans ask for.
     try {
-      state.larkApp = { source, app: await enterApp(ctx, { previous: state.larkApp?.app }) };
+      const app = source === 'manual' ? await enterApp(ctx, { previous: state.larkApp?.app }) : null;
+      const access = await askLarkAccess(prompter, state.larkApp?.access ?? current?.larkMessageAccess ?? 'owner');
+      state.larkApp = { source, ...(app ? { app } : {}), access };
       break;
     } catch (error) {
       if (!(error instanceof GoBack)) throw error;
@@ -514,8 +560,12 @@ async function askMailboxes(ctx, state) {
 }
 
 // The instance's on/off settings, under 其他设置, and what each is when the
-// manifest does not say.
-const SWITCH_DEFAULTS = Object.freeze({ stagedReplies: false, naturalWriting: true, explicitSilence: false, ovAutoRecall: false, meetingNotes: false });
+// manifest does not say. OpenViking memory has no switch here: Vika always
+// owns it (agents[].ovAutoRecall stays a config-file-only option).
+const SWITCH_DEFAULTS = Object.freeze({ stagedReplies: false, naturalWriting: true, explicitSilence: true, meetingNotes: false });
+// Explicit silence is on by default except on Ark, which has no Core tools to
+// offer stay_silent through (as the deployment manifest defaults it).
+const switchDefault = (key, model) => (key === 'explicitSilence' && model === 'ark' ? false : SWITCH_DEFAULTS[key]);
 // Switching one of these changes the model's policy: a new session.
 const POLICY_SWITCHES = new Set(['stagedReplies', 'naturalWriting', 'explicitSilence', 'meetingNotes']);
 
@@ -544,8 +594,6 @@ const SWITCHES = () => [
     hint: t('写得像人，去掉 AI 腔', 'writes like a person, without the AI tone') },
   { key: 'explicitSilence', label: t('显式不回复', 'Explicit silence'),
     hint: t('每条消息都要模型表态：回复，或记下不回；漏了提醒一次', 'the model decides on every message: a reply, or a note that it stays silent; a miss gets one reminder') },
-  { key: 'ovAutoRecall', label: t('OpenViking 自动召回', 'OpenViking auto-recall'),
-    hint: t('每轮自动召回 OpenViking 里的相关记忆', 'recalls related OpenViking memory on every turn') },
   { key: 'meetingNotes', label: t('会议纪要入库', 'Meeting notes'),
     hint: t('你参加的飞书会议，智能纪要和文字记录存进 OpenViking；一台机器上只有一个实例能开',
       'the Feishu/Lark AI notes and transcripts of your meetings go into OpenViking; one instance per machine') },
@@ -907,13 +955,15 @@ async function confirmUnshared({ prompter, larkCli, appId, others }) {
 
 // The app from `source`: a scan, or `app` typed in with the questions. It is
 // checked against what Vika needs, written to the lark-cli profile, and the
-// owner authorizes as a user (the second scan). `others` are the machine's
-// other instances with Feishu. Resolves with { profile, ownerOpenId, name },
-// name being the app's own, when it could be read.
+// owner authorizes as a user (the second scan). `access` is whose visibility
+// the bot reads with (larkScopes). `others` are the machine's other instances
+// with Feishu. Resolves with { profile, ownerOpenId, name }, name being the
+// app's own, when it could be read.
 export async function connectLark({
-  plan, prompter, larkCli, fetchImpl, profile, source = 'create', app: typed = null, others = [], debug = false, canGoBack = false, register = null,
+  plan, prompter, larkCli, fetchImpl, profile, source = 'create', app: typed = null, access = 'owner', others = [], debug = false,
+  canGoBack = false, register = null,
 }) {
-  const scopes = larkScopes();
+  const scopes = larkScopes(access);
   prompter.section(IM_LABELS.lark);
   // Only the first code can be gone back from: once it is confirmed the app exists.
   const app = typed ?? await registerApp({ plan, prompter, scopes, debug, canGoBack, mode: source, fetchImpl, register });
@@ -945,11 +995,12 @@ export async function connectLark({
   }
   await larkCli.configureProfile({ profile, ...app });
   const login = await larkCli.beginUserLogin({ profile, scopes: grantedUserScopes(scopes, inspected) });
+  const what = access === 'bot'
+    ? t('授权 Vika 以你的身份用文档、日历等（不读你的消息）', 'let Vika use documents, calendar and more as you (not your messages)')
+    : t('授权 Vika 以你的身份读消息（用于搜索和读历史）', 'let Vika read messages as you (for search and history)');
   const scan = showScan(prompter, {
     url: login.url, where: IM_LABELS.lark, label: t('等待授权', 'Waiting for authorization'),
-    title: source === 'manual'
-      ? t('扫码授权 Vika 以你的身份读消息（用于搜索和读历史）', 'Scan to let Vika read messages as you (for search and history)')
-      : t('第 2 次扫码：授权 Vika 以你的身份读消息（用于搜索和读历史）', 'Scan 2 of 2: let Vika read messages as you (for search and history)'),
+    title: source === 'manual' ? t(`扫码${what}`, `Scan to ${what}`) : t(`第 2 次扫码：${what}`, `Scan 2 of 2: ${what}`),
   });
   try {
     await larkCli.finishUserLogin({ profile, deviceCode: login.deviceCode });
@@ -962,8 +1013,20 @@ export async function connectLark({
     prompter.warn(t('两次扫码的不是同一个飞书账号；机器人会把第 2 次扫码的人当作主人。',
       'The two scans came from different Feishu/Lark accounts; the bot takes the second as its owner.'));
   }
+  if (access === 'bot') await warnOwnerReads(prompter, larkCli, profile);
   prompter.success(t('飞书已接好', 'Feishu/Lark is connected'));
   return { profile, ownerOpenId, name: inspected?.botName ?? inspected?.name ?? null };
+}
+
+// An app the owner once let read their messages keeps that grant, whatever
+// it asks for now: Vika itself reads as the bot, but the grant stays usable.
+async function warnOwnerReads(prompter, larkCli, profile) {
+  let granted = null;
+  try { granted = await larkCli.userScopes({ profile }); } catch {}
+  const kept = (granted ?? []).filter((scope) => OWNER_MESSAGE_SCOPES.includes(scope));
+  if (!kept.length) return;
+  prompter.warn(t(`你以前允许过这个应用以你的身份读消息（${list(kept)}），飞书不会收回：Vika 的工具只用机器人身份读消息，但机器人在命令行里用 lark-cli 仍能以你的身份搜到消息。要彻底隔开，换一个新建的机器人。`,
+    `You once let this app read messages as you (${list(kept)}), and Feishu/Lark keeps that grant: Vika's tools read only as the bot, but with lark-cli in its shell the bot can still search messages as you. To keep them apart for sure, use a newly created bot.`));
 }
 
 // The app as its bot reads it, through the instance's profile.
@@ -981,7 +1044,7 @@ async function loginLacks(larkCli, agent, scopes, inspected) {
 // What a Feishu/Lark instance lacks of what this release asks for: the
 // app's scopes, events and card callback, and the owner's login. Rejects
 // when the app cannot be read.
-export async function larkNeeds({ agent, larkCli, scopes = larkScopes() }) {
+export async function larkNeeds({ agent, larkCli, scopes = larkScopes(agent.larkMessageAccess) }) {
   const inspected = await readInstanceApp(larkCli, agent);
   const missing = missingConfig(scopes, inspected);
   const login = await loginLacks(larkCli, agent, scopes, inspected);
@@ -993,7 +1056,7 @@ export async function larkNeeds({ agent, larkCli, scopes = larkScopes() }) {
 // lacks, the platform's confirm page showing the change. Resolves with
 // { inspected, updated }: what was read last (null when the app's settings
 // cannot be read) and whether the platform confirmed a change.
-export async function completeLarkApp({ agent, prompter, larkCli, scopes = larkScopes(), register = null }) {
+export async function completeLarkApp({ agent, prompter, larkCli, scopes = larkScopes(agent.larkMessageAccess), register = null }) {
   const read = async () => {
     const spinning = prompter.spin(t('核对应用的权限和事件', 'Checking the app\'s permissions and events'));
     try {
@@ -1037,11 +1100,14 @@ export async function completeLarkApp({ agent, prompter, larkCli, scopes = larkS
 
 // The owner authorizes Vika as a user again (a scan), for the user scopes
 // the app has.
-export async function reauthorizeOwner({ agent, prompter, larkCli, scopes = larkScopes(), inspected = null }) {
+export async function reauthorizeOwner({ agent, prompter, larkCli, scopes = larkScopes(agent.larkMessageAccess), inspected = null }) {
   const login = await larkCli.beginUserLogin({ profile: agent.profile, scopes: grantedUserScopes(scopes, inspected) });
   const scan = showScan(prompter, {
     url: login.url, where: IM_LABELS.lark, label: t('等待授权', 'Waiting for authorization'),
-    title: t(`扫码重新授权 ${agent.displayName}（${agent.profile}）以你的身份读消息`, `Scan to let ${agent.displayName} (${agent.profile}) read messages as you again`),
+    title: agent.larkMessageAccess === 'bot'
+      ? t(`扫码重新授权 ${agent.displayName}（${agent.profile}）以你的身份用文档、日历等（不读你的消息）`,
+        `Scan to let ${agent.displayName} (${agent.profile}) use documents, calendar and more as you again (not your messages)`)
+      : t(`扫码重新授权 ${agent.displayName}（${agent.profile}）以你的身份读消息`, `Scan to let ${agent.displayName} (${agent.profile}) read messages as you again`),
   });
   try {
     await larkCli.finishUserLogin({ profile: agent.profile, deviceCode: login.deviceCode });
@@ -1053,7 +1119,7 @@ export async function reauthorizeOwner({ agent, prompter, larkCli, scopes = lark
 
 // After an upgrade: the app gets what it lacks with one scan, then the owner authorizes again if their
 // login lacks scopes the app now has. Resolves with whether the app changed.
-export async function updateLarkApp({ agent, prompter, larkCli, scopes = larkScopes(), register = null }) {
+export async function updateLarkApp({ agent, prompter, larkCli, scopes = larkScopes(agent.larkMessageAccess), register = null }) {
   const { inspected, updated } = await completeLarkApp({ agent, prompter, larkCli, scopes, register });
   const lacking = await loginLacks(larkCli, agent, scopes, inspected);
   if (lacking.length) {
@@ -1072,9 +1138,8 @@ export async function checkLarkApps({ prompter, env, manifest }) {
   const bin = agents.length ? env.LARK_CLI_BIN || manifest.env?.LARK_CLI_BIN || resolveLarkCli(env) : null;
   if (!bin) return [];
   const larkCli = new LarkCli(bin);
-  const scopes = larkScopes();
   const spinning = prompter.spin(t('核对飞书应用的权限和事件', 'Checking the Feishu/Lark apps\' permissions and events'));
-  const checked = await Promise.all(agents.map((agent) => larkNeeds({ agent, larkCli, scopes }).then(
+  const checked = await Promise.all(agents.map((agent) => larkNeeds({ agent, larkCli }).then(
     (needs) => (needs.count ? { agent, ...needs } : null), () => null)));
   const lacking = checked.filter(Boolean);
   if (lacking.length) {
@@ -1360,12 +1425,14 @@ export async function setupCommand(options = {}) {
   // What the first pass learned (the detected agents), kept when ← goes all
   // the way back to 要做什么 and setup starts over.
   const memo = {};
+  // OV users an administrator key created in this run, across starting over.
+  const registrations = new OVRegistrations();
   prompter.pageTop = () => live?.top() ?? null;
   try {
     for (;;) {
       const pendingOV = new Set();
       try {
-        return await setupFlow({ ...options, live, memo, pendingOV });
+        return await setupFlow({ ...options, live, memo, pendingOV, registrations });
       } catch (error) {
         if (!(error instanceof StartOver)) throw error;
       } finally {
@@ -1373,6 +1440,17 @@ export async function setupCommand(options = {}) {
       }
     }
   } finally {
+    // Saved, cancelled or failed: a user created here that no saved instance
+    // uses is deleted again, or named for the owner to remove.
+    const { failed, pending } = await registrations.discard({ fetchImpl: options.fetchImpl ?? globalThis.fetch });
+    if (pending.length) {
+      prompter.warn(t(`OpenViking 还在删除这次 setup 创建但没有用上的用户 ${pending.join('、')}，删完之前同名用户无法再创建，稍后再重试 setup`,
+        `OpenViking is still deleting the users this setup created and did not use: ${pending.join(', ')}. Until it is done the name cannot be created again; retry setup in a moment`));
+    }
+    if (failed.length) {
+      prompter.warn(t(`OpenViking 里留下了这次 setup 创建但没有用上的用户 ${failed.join('、')}，请管理员删除`,
+        `This setup created OpenViking users it did not use and could not delete: ${failed.join(', ')}. Ask an administrator to remove them`));
+    }
     prompter.navigable = false;
     prompter.pageTop = null;
     live?.release();
@@ -1393,6 +1471,7 @@ async function setupFlow({
   live = null,
   memo = {},
   pendingOV = new Set(),
+  registrations,
 }) {
   const out = (text) => prompter.write(text);
   const vika = vikaCommand(env);
@@ -1442,11 +1521,12 @@ async function setupFlow({
   ctx.editOV = async () => {
     const detected = await configureOV({ prompter, env, homeDir, fetchImpl, detect: detect.openViking,
       preferredConfigPath: state.ovConfig, title: `OpenViking · ${current.id}`, canGoBack: true,
-      leaveTo: t('返回实例设置', 'Back to instance settings') });
+      leaveTo: t('返回实例设置', 'Back to instance settings'),
+      taken: takenIdentities({ agents: manifest.agents, exclude: current.id, homeDir }), instanceId: current.id });
     const pending = new Set();
     try {
       const target = await prepareInstanceOpenViking({
-        agent: { ...current, ovConfig: state.ovConfig }, detected, pending, env, homeDir, fetchImpl,
+        agent: { ...current, ovConfig: state.ovConfig }, detected, pending, env, homeDir, fetchImpl, registrations,
         detect: detect.openViking, reserved: new Set(manifest.agents.map(({ ovConfig }) => ovConfig)),
       });
       if (target !== state.ovConfig && pendingOV.has(state.ovConfig)) {
@@ -1473,20 +1553,29 @@ async function setupFlow({
     return checked;
   };
   ctx.checkOV = checkOV;
+  // The instance is a user of its own in OV (instanceOvConfig), said once here.
   const prepareOV = () => step(prompter, t('准备并验证实例的 OpenViking 配置', 'Preparing and checking this instance’s OpenViking config'), async () => {
     if (prepared?.id !== state.id || prepared?.ov !== ov) {
       for (const file of pendingOV) fs.rmSync(file, { force: true });
       pendingOV.clear();
       state.ovConfig = availableInstanceOvConfig(env, state.id, new Set(manifest?.agents.map(({ ovConfig }) => ovConfig)));
-      writeInstanceOvConfig({ detected: ov, instanceId: state.id, target: state.ovConfig, exclusive: true });
+      const config = await instanceOvConfig({ detected: ov, instanceId: state.id, fetchImpl, registrations });
+      writeInstanceOvConfig({ config, target: state.ovConfig, exclusive: true });
       pendingOV.add(state.ovConfig);
-      prepared = { id: state.id, ov };
+      // Under an API key the key's user, as the connection check reported it.
+      prepared = { id: state.id, ov, user: config.user ?? ov?.user ?? null };
     }
     await checkOV();
-  }, t('OpenViking 已就绪，接下来接入 IM', 'OpenViking is ready; next, connect your IMs'));
+    return prepared.user;
+  }, (user) => (user
+    ? t(`OpenViking 已就绪，接下来接入 IM（这个实例在 OpenViking 里是用户 ${user}）`,
+      `OpenViking is ready; next, connect your IMs (this instance is the OpenViking user ${user})`)
+    : t('OpenViking 已就绪，接下来接入 IM', 'OpenViking is ready; next, connect your IMs')));
   // The section heading comes from the wizard; ← goes back to 要做什么, if there was a choice.
   const chooseOV = async () => {
-    ov = await configureOV({ prompter, env, homeDir, fetchImpl, detect: detect.openViking, title: null, canGoBack: others, previous: ov });
+    ov = await configureOV({ prompter, env, homeDir, fetchImpl, detect: detect.openViking, title: null, canGoBack: others, previous: ov,
+      // Not named yet: the name is asked after the connection.
+      taken: takenIdentities({ agents: manifest?.agents ?? [], homeDir }) });
   };
 
   // The instance as the manifest will hold it.
@@ -1505,7 +1594,14 @@ async function setupFlow({
     else delete agent.role;
     if (state.connectors.includes('lark')) agent.profile = current?.profile ?? `vika-${state.id}`;
     else delete agent.profile;
+    // A new app reads as chosen for it; the app kept reads as it did.
+    const access = state.larkApp ? state.larkApp.access : current?.larkMessageAccess;
+    if (state.connectors.includes('lark') && access === 'bot') agent.larkMessageAccess = 'bot';
+    else delete agent.larkMessageAccess;
     agent.ovConfig = state.ovConfig;
+    // Retired OpenViking options: peers are gone, and remember is always on.
+    delete agent.ovRecallScope;
+    delete agent.ovRemember;
     Object.assign(agent, state.switches);
     if (emailAccounts.length) agent.emailAccounts = emailAccounts;
     else delete agent.emailAccounts;
@@ -1621,7 +1717,7 @@ async function setupFlow({
       lark = newIms.includes('lark')
         ? await connect.lark({
           plan, prompter, larkCli: new LarkCli(larkCliBin), fetchImpl, profile: agent.profile, debug: Boolean(env.VIKA_DEBUG), canGoBack: prompter.tty,
-          source: larkSource(state, current), app: state.larkApp?.app ?? null,
+          source: larkSource(state, current), app: state.larkApp?.app ?? null, access: state.larkApp?.access ?? 'owner',
           others: (manifest?.agents ?? []).filter((other) => other.id !== state.id && other.profile),
         })
         : null;
@@ -1678,6 +1774,7 @@ async function setupFlow({
   fs.mkdirSync(state.workspace, { recursive: true, mode: 0o700 });
   writeManifest(configPath, manifestWith(agent), { expected: manifest });
   pendingOV.delete(agent.ovConfig);
+  registrations?.keep(agent.ovConfig);
   if (ov && agent.ovConfig !== current?.ovConfig) saveOVConnection(ov, { env, homeDir });
   for (const mailbox of mail.removed) fs.rmSync(mailbox.config, { force: true });
 
@@ -1700,7 +1797,7 @@ async function setupFlow({
     // restarts to pick this one up) and the updater are helpers: report, go on.
     for (const [action, target, label] of [
       ['restart', 'web', t(`控制台 http://127.0.0.1:${WEB_PORT}`, `Console http://127.0.0.1:${WEB_PORT}`)],
-      ['start', 'updater', t('自动升级服务', 'Auto-upgrade service')],
+      ...(capabilities.updater ? [['start', 'updater', t('自动升级服务', 'Auto-upgrade service')]] : []),
     ]) {
       const spinning = prompter.spin(t(`启动${label}`, `Starting the ${label.toLowerCase()}`));
       await control[action](target, { env, stdout: quiet }).then(
@@ -1799,7 +1896,7 @@ function describeChanges(before, after, mailboxes, homeDir, state) {
   }
   if (before.model !== after.model) changes.push(`${t('运行时：', 'Runtime: ')}${before.model} → ${after.model}`);
   for (const { key, label } of SWITCHES()) {
-    const was = before[key] ?? SWITCH_DEFAULTS[key];
+    const was = before[key] ?? switchDefault(key, before.model);
     if (was === after[key]) continue;
     const arrow = `${onOff(was)} → ${onOff(after[key])}`;
     const policy = POLICY_SWITCHES.has(key);

@@ -215,6 +215,7 @@ function fakeCodexSource(dir, { behavior, failBlob }) {
       if (msg.method === 'initialize') { send({ id: msg.id, result: {} }); return; }
       if (msg.method === 'initialized') { return; }
       if (msg.method === 'thread/start' || msg.method === 'thread/resume') {
+        fs.appendFileSync(SPAWN_LOG + '.threads', JSON.stringify(msg.params) + '\\n');
         send({ id: msg.id, result: { thread: { id: 'thread-mock' } } });
         send({ method: 'thread/started', params: { thread: { id: 'thread-mock' } } });
         return;
@@ -301,6 +302,7 @@ function readLines(file) {
 export async function startMockEnv({
   codex = {},
   ovCheck = async () => {},
+  ovClient = {},
   config: configOverrides = {},
   prepare = null,
 } = {}) {
@@ -336,6 +338,7 @@ export async function startMockEnv({
     initialModel: '',
     claudeModel: '',
     openVikingConfigPath,
+    timerStorage: 'sqlite',
     ignoredSenderIds: new Set(),
     port: 0,
     httpEnabled: false,
@@ -346,11 +349,13 @@ export async function startMockEnv({
   const daemon = new PersonalAgentDaemon(config, createLogger('error', { test: 'mock-env' }), {
     ovClient: {
       check: ovCheck,
+      namespace: 'mock-namespace',
       messages: new Map(),
       async create(sessionId) { return { session_id: sessionId, uri: `viking://session/${sessionId}` }; },
       async append(id, message) { const rows = this.messages.get(id) || []; rows.push({ ...message, parts: [{ type: 'text', text: message.content }] }); this.messages.set(id, rows); },
       async context(id) { return { latest_archive_overview: '', messages: this.messages.get(id) || [], stats: { totalArchives: 0 } }; },
       async request() { return { pending_tokens: 0 }; },
+      ...ovClient,
     },
   });
 
@@ -371,6 +376,9 @@ export async function startMockEnv({
 
     // argv of every fake codex spawn (policy assertions live here:
     // developer_instructions is a `-c` config override).
+    codexThreadParams() {
+      return readLines(path.join(dir, 'codex-spawns.ndjson.threads')).map((line) => JSON.parse(line));
+    },
     codexSpawnArgs() {
       return readLines(path.join(dir, 'codex-spawns.ndjson')).map((line) => JSON.parse(line));
     },

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Beijing Volcano Engine Technology Co., Ltd.
 // SPDX-License-Identifier: AGPL-3.0
 
+import { PI_BUILTIN_EXTENSIONS } from '../src/ov-isolation.mjs';
 import { ovFixture } from './ov-fixture.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -63,7 +64,7 @@ class FakeChild extends EventEmitter {
 
 const helpFlags = [
   '--mode', '--append-system-prompt', '--thinking', '--session-id', '--session-dir',
-  '--model', '--extension', '--approve', 'rpc',
+  '--model', '--extension', '--approve', '--no-extensions', 'rpc',
 ].join('\n');
 
 function parsedWrites(child) {
@@ -195,6 +196,7 @@ function harness({ config = baseConfig, store = makeStore(), agentOptions = {}, 
   const failures = [];
   const agent = new PiAgent(config, store, quietLogger, {
     spawn,
+    isolationArgs: async () => ['-ne', ...PI_BUILTIN_EXTENSIONS.flatMap((entry) => ['--extension', entry])],
     startTimeoutMs: 100,
     onTurnFailed: (failure) => failures.push(failure),
     ...agentOptions,
@@ -365,7 +367,11 @@ describe('PiAgent persistent rpc runtime', () => {
     assert.equal(runtimePrompt, assembleConversationPolicy(baseConfig));
     assert.doesNotMatch(runtimePrompt, /Agent tools from bash|actions\/cli\.mjs/);
     assert.doesNotMatch(runtimePrompt, /lark-cli im \+messages-reply/);
-    assert.equal(args[args.indexOf('--extension') + 1], PI_MCP_EXTENSION);
+    assert.equal(args[args.lastIndexOf('--extension') + 1], PI_MCP_EXTENSION);
+    // Pi's own OpenViking extension stays off; its built-ins load by name.
+    assert.ok(args.includes('-ne'));
+    assert.deepEqual(args.filter((arg, index) => args[index - 1] === '--extension' && arg.startsWith('builtin:')),
+      PI_BUILTIN_EXTENSIONS);
     assert.deepEqual(JSON.parse(env.PERSONAL_AGENT_MCP_CONFIG), {
       command: process.execPath,
       args: [baseConfig.actionMcpPath, '--socket', baseConfig.actionSocketPath, '--authority', agent.authorityToken],
@@ -462,6 +468,43 @@ describe('PiAgent persistent rpc runtime', () => {
     child.feed({ type: 'agent_settled' });
     assert.equal(agent.turnInProgress, false);
     await agent.stop();
+  });
+
+  it('skips an oversized tool result echo and finishes the turn, but still fails on an oversized line it needs', async () => {
+    // A get_message_media result with a large image, echoed on one stdout line
+    // and delivered in pipe-sized chunks.
+    const emitLine = (child, value) => {
+      const line = `${JSON.stringify(value)}\n`;
+      for (let index = 0; index < line.length; index += 65_536) child.stdout.emit('data', line.slice(index, index + 65_536));
+    };
+    const image = { type: 'image', data: 'A'.repeat(5_000_001), mimeType: 'image/png' };
+
+    const { agent, persistent, failures, store } = harness();
+    await agent.start();
+    const child = persistent[0];
+    agent.deliver('what is in this picture?', 7);
+    child.feed({ type: 'tool_execution_start', toolCallId: 'call_media', toolName: 'get_message_media', args: {} });
+    emitLine(child, { type: 'tool_execution_end', toolCallId: 'call_media', toolName: 'get_message_media',
+      result: { content: [image] }, isError: false });
+    emitLine(child, { type: 'agent_end', messages: [{ role: 'toolResult', content: [image] }] });
+    child.feed({ type: 'agent_settled' });
+
+    assert.equal(agent.turnInProgress, false);
+    assert.equal(child.exitCode, null);
+    assert.deepEqual(failures, []);
+    const completed = store.activities.find((activity) => activity.kind === 'agent.tool_completed');
+    assert.equal(completed.metadata.toolId, 'call_media');
+    assert.equal(completed.metadata.toolName, 'get_message_media');
+    await agent.stop();
+
+    const needed = harness();
+    await needed.agent.start();
+    needed.agent.deliver('what is in this picture?', 7);
+    emitLine(needed.persistent[0], { type: 'response', command: 'get_state', success: true, data: image.data });
+    assert.equal(needed.persistent[0].exitCode, 137);
+    await waitFor(() => needed.failures.length === 1);
+    assert.match(needed.failures[0].error, /pi stdout line exceeded local limit/);
+    await needed.agent.stop();
   });
 
   it('demotes the stored session when stopped mid-turn, keeps it after a clean stop', async () => {

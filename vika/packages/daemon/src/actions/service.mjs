@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 import { createHash, randomUUID } from 'node:crypto';
-import { conversationKeyFor, eventIdentity } from '../event.mjs';
+import { conversationKeyFor, eventIdentity, normalizeEvent } from '../event.mjs';
 import { registerCard } from '../card-messages.mjs';
 import {
   cancelApproval, claimApproval, createApproval, editApproval, finishApproval, getApproval, supersedeApprovals,
@@ -12,8 +12,10 @@ import { meetingFolder, meetingNotesRoot, meetingReadTarget } from '../meeting/n
 import { meetingContextLines } from '../meeting/index.mjs';
 import { OVUnavailableError } from '../ov-connection.mjs';
 import { OVSessionClient, withoutWorkingMemory } from '../ov-session-context.mjs';
+import { OVToolClient } from '../ov-tools.mjs';
 import { opaqueRef, redactSensitive, safeError } from '../logger.mjs';
-import { BOT_SENDERS, readMetadataTag } from '../runtime-input.mjs';
+import { BOT_SENDERS, isoMinute, readMetadataTag, senderLabel } from '../runtime-input.mjs';
+import { personDirectory, personId } from '../ov-person.mjs';
 import { TimerSchedule } from '../timers.mjs';
 import {
   APPROVAL_SECONDS, approvalCard, approvalMessage, approvalNote, approvalQuestion, approvalStatusText, approvedText,
@@ -53,7 +55,13 @@ const HANDLERS = {
   create_timer: 'createTimer',
   list_timers: 'listTimers',
   cancel_timer: 'cancelTimer',
-  complete_timer_occurrence: 'completeTimerOccurrence',
+  finish_timer_occurrence: 'finishTimerOccurrence',
+  openviking_find: 'openvikingFind',
+  openviking_search: 'openvikingSearch',
+  openviking_read: 'openvikingRead',
+  openviking_list: 'openvikingList',
+  openviking_add_resource: 'openvikingAddResource',
+  openviking_remember: 'openvikingRemember',
 };
 
 // A refusal the model can act on; `code` is what logs and activities record.
@@ -63,10 +71,14 @@ function blocked(code, message) {
 
 // Tools whose success changes something (a delivery, a decision, a timer), as
 // against reads. Only these count as progress for the loop guard; marking a
-// timer occurrence done counts only when it was marked.
+// timer occurrence done counts only when it was marked. An OpenViking write
+// counts only when the server took it (a task_id came back, or a preference
+// was stored or removed): the rest are reads, and a write that failed lands
+// nothing.
 const STATE_TOOLS = new Set(['stay_silent', 'create_timer', 'cancel_timer']);
 function changesState(tool, result) {
-  if (tool?.name === 'complete_timer_occurrence') return result?.data?.completed === true;
+  if (tool?.name === 'finish_timer_occurrence') return result?.data?.completed === true;
+  if (tool?.openviking) return Boolean(result?.data?.task_id || result?.data?.root_uri || result?.data?.stored || result?.data?.removed);
   return Boolean(tool?.action) || STATE_TOOLS.has(tool?.name);
 }
 
@@ -123,15 +135,17 @@ export class ActionService {
     liveness = null,
     meetingEnabled = false,
     ovClient = null,
+    ovTools = null,
     timers = null,
     clock = () => Date.now(),
     onTimersChanged = () => {},
+    onPreferencesChanged = () => {},
     onNoProgress = null,
     loopBreakAfter = LOOP_BREAK_AFTER,
     logger,
   }) {
     Object.assign(this, {
-      config, store, connectors, roster, liveness, meetingEnabled, ovClient, timers, clock, onTimersChanged,
+      config, store, connectors, roster, liveness, meetingEnabled, ovClient, ovTools, timers, clock, onTimersChanged, onPreferencesChanged,
       onNoProgress, loopBreakAfter, logger,
     });
     // Loop guard: duplicate outcomes per input in the current turn, cleared
@@ -175,7 +189,7 @@ export class ActionService {
     if (tool.connector) return this.connectors.manifests().some(([, manifest]) => manifest.name === tool.connector);
     if (tool.meeting) return this.meetingEnabled;
     if (tool.meetingNotes) return Boolean(this.config.meetingNotes);
-    if (tool.openviking) return Boolean(this.ovClient || this.config.openVikingConfigPath);
+    if (tool.openviking) return Boolean(this.ovTools || this.ovClient || this.config.openVikingConfigPath);
     if (tool.timer) return Boolean(this.timers);
     if (tool.explicitSilence) return Boolean(this.config.explicitSilence);
     return true;
@@ -188,6 +202,7 @@ export class ActionService {
   definition(tool) {
     return toolDefinition(tool, {
       explicitSilence: Boolean(this.config.explicitSilence), stagedReplies: Boolean(this.config.stagedReplies),
+      larkMessageAccess: this.config.larkMessageAccess,
     });
   }
 
@@ -208,6 +223,11 @@ export class ActionService {
       try { validateInput(this.definition(tool).inputSchema, input); } catch (error) { throw blocked('invalid_input', error.message); }
       this.assertAuthority(authority);
       trace.runtime = this.store.getCognitionState().runtime;
+      if (tool.timer && this.timers.needsRefresh) {
+        try { await this.timers.load(); } catch {
+          throw blocked('timer_unavailable', 'Timer state is temporarily unavailable. Try again after OpenViking recovers.');
+        }
+      }
       let result = await this[HANDLERS[name]](input, caller);
       // Only a call that changed nothing says STOP: a success after a refused
       // attempt (decision_ambiguous fixed with decision_instance) is a fix.
@@ -1145,6 +1165,14 @@ export class ActionService {
     if (input.cursor !== undefined && this.manifest(connector).name !== 'slack') {
       throw blocked('unsupported', 'cursor is currently supported only for Slack queries.');
     }
+    // A bot-only Lark instance reads every message as the bot, so only in the
+    // chats it has joined; the tool schema already offers no other identity.
+    if (this.config.larkMessageAccess === 'bot' && this.manifest(connector).name === 'lark') {
+      if (input.as === 'user') {
+        throw blocked('unsupported', 'This instance reads only the chats the Lark bot has joined; reading as the owner is turned off.');
+      }
+      if (operation === 'message.search') input = { ...input, as: 'bot' };
+    }
     caller.trace.invoked = true;
     const data = await this.connectors.invoke(connector, operation, input);
     this.assertAuthority(caller.authority);
@@ -1238,7 +1266,10 @@ export class ActionService {
       }
       uri = entry ? entry.uri : archive.body;
     }
-    const found = /[%\\]/.test(uri) ? null : readTarget(mailArchiveRoot(client.user), uri);
+    // Search returns canonical URIs; accept only the authenticated user's
+    // archive as well as the ~ links emitted by the connector.
+    const root = mailArchiveRoot(uri?.startsWith('viking://user/') ? await client.authenticate() : null);
+    const found = /[%\\]/.test(uri) ? null : readTarget(root, uri);
     if (!found) throw blocked('outside_mail_archive', 'read_email reads only mail the daemon stored');
     return this.readArchived(client, found, input, caller, {
       missing: blocked('not_stored_yet', 'OpenViking has nothing there yet; an attachment may still be being read. Try again shortly.'),
@@ -1252,7 +1283,7 @@ export class ActionService {
     if (Boolean(input.meeting_id) === Boolean(input.uri)) throw blocked('invalid_input', 'Pass meeting_id or uri, not both');
     if (input.part && !input.meeting_id) throw blocked('invalid_input', 'part goes with meeting_id');
     const client = this.ovClient ?? new OVSessionClient(this.config.openVikingConfigPath);
-    const root = meetingNotesRoot(client.user);
+    const root = meetingNotesRoot(input.uri?.startsWith('viking://user/') ? await client.authenticate() : null);
     let uri = input.uri;
     if (input.meeting_id) {
       if (!/^\d{1,32}$/.test(input.meeting_id)) throw blocked('invalid_input', 'meeting_id is the meeting\'s long numeric id');
@@ -1298,8 +1329,8 @@ export class ActionService {
   }
 
   async readOVSession(input, caller) {
-    const state = this.store.db.prepare('SELECT session_id, uri FROM ov_session_sync WHERE epoch = ?').get(input.epoch);
-    if (!state?.uri) throw new Error('No OpenViking session is linked to this epoch');
+    const state = this.store.ovSessionFor?.(input.epoch);
+    if (!state) throw new Error('No OpenViking session is linked to this epoch');
     const client = this.ovClient ?? new OVSessionClient(this.config.openVikingConfigPath);
     let result;
     if (input.archive_id) result = await client.archive(state.uri, input.archive_id);
@@ -1357,8 +1388,12 @@ export class ActionService {
   async createTimer(input, caller) {
     if (!this.timers) throw blocked('unknown_tool', 'timer tools are not available');
     const fence = this.fence(input, caller);
-    const existing = this.timers.findByDecision(fence.connector_instance, fence.event_id);
-    if (existing) return this.timerResult(existing, { duplicate: true });
+    const existing = this.timers.needsRefresh ? null
+      : this.timers.findByDecision(fence.connector_instance, fence.event_id);
+    if (existing) {
+      this.onTimersChanged?.();
+      return this.timerResult(existing, { duplicate: true });
+    }
     const maxRuns = input.max_runs === undefined || input.max_runs === null ? null : Number(input.max_runs);
     if (maxRuns !== null && (!Number.isSafeInteger(maxRuns) || maxRuns < 1)) {
       throw blocked('invalid_input', 'max_runs must be a positive integer or null');
@@ -1369,7 +1404,7 @@ export class ActionService {
       nowMs,
       timezone,
     });
-    const timer = this.timers.create({
+    const timer = await Promise.resolve().then(() => this.timers.create({
       title: input.title,
       text: input.text,
       timezone,
@@ -1380,8 +1415,7 @@ export class ActionService {
       createdFromEventId: fence.event_id,
       createdFromSource: fence.connector_instance,
       createdAtMs: nowMs,
-    });
-    this.onTimersChanged?.();
+    })).finally(() => this.onTimersChanged?.());
     return this.timerResult(timer, { duplicate: false });
   }
 
@@ -1424,40 +1458,161 @@ export class ActionService {
     return { text: `Active timers (${timers.length}):\n${lines.join('\n')}`, data: { timers } };
   }
 
-  cancelTimer(input) {
+  async cancelTimer(input) {
     if (!this.timers) throw blocked('unknown_tool', 'timer tools are not available');
-    const cancelled = this.timers.cancelWithOccurrenceChecks(input.timer_id);
-    if (cancelled) this.onTimersChanged?.();
+    const cancelled = await Promise.resolve().then(() => this.timers.cancel(input.timer_id))
+      .finally(() => this.onTimersChanged?.());
     return {
       text: cancelled ? `Timer cancelled: timer_id=${input.timer_id}.` : `Timer was not active: timer_id=${input.timer_id}.`,
       data: { timer_id: input.timer_id, cancelled },
     };
   }
 
-  completeTimerOccurrence(input) {
+  async finishTimerOccurrence(input, caller) {
     if (!this.timers) throw blocked('unknown_tool', 'timer tools are not available');
-    const pending = this.timers.getOccurrenceCheck(input.occurrence_id);
-    const delivery = pending?.event.data?.timer?.delivery;
-    const connector = delivery?.mode === 'owner' ? this.config.channel : delivery?.source;
-    const target = delivery?.mode === 'owner'
-      ? this.connectors.owner?.(connector)?.target
-      : delivery?.mode === 'chat' ? { chat_id: delivery.chat_id } : null;
-    if (!target || !this.store.sentTimerOccurrenceDelivery(input.occurrence_id, { connector, target })) {
+    if (this.timers.needsRefresh) await this.timers.load();
+    const check = this.timers.getOccurrenceCheck(input.occurrence_id);
+    if (!check) throw blocked('unknown_occurrence', 'This timer occurrence has no completion check.');
+    let delivery = null;
+    if (input.delivery) {
+      const tool = TOOLS.find((candidate) => candidate.name === input.delivery.tool);
+      if (!tool || !this.offered(tool)) throw blocked('unknown_tool', `unknown tool: ${input.delivery.tool}`);
+      try { validateInput(this.definition(tool).inputSchema, input.delivery.input); } catch (error) {
+        throw blocked('invalid_input', error.message);
+      }
+      if (input.delivery.input.interim || input.delivery.input.choices !== undefined) {
+        throw blocked('invalid_input', 'Use ordinary delivery tools for interim updates or questions with choices.');
+      }
+      const decision = this.resolveDecision(input.delivery.input, caller);
+      if (!this.isTimerReminder(decision)
+        || JSON.parse(decision.event_json).data?.timer?.occurrence_id !== input.occurrence_id) {
+        throw blocked('invalid_input', 'The delivery decision_id must belong to this timer occurrence.');
+      }
+    } else if (!input.reason?.trim()) {
+      throw blocked('invalid_input', 'reason is required when no delivery is needed.');
+    }
+    if (check.status === 'completed') {
       return {
-        text: `Timer occurrence is not complete: no successful delivery is recorded for occurrence_id=${input.occurrence_id}.`,
-        data: { occurrence_id: input.occurrence_id, completed: false },
+        text: `Timer occurrence already completed: occurrence_id=${input.occurrence_id}.`,
+        data: { occurrence_id: input.occurrence_id, completed: true, duplicate: true },
       };
     }
-    const check = this.timers.markOccurrenceCompleted(input.occurrence_id);
-    if (!check) {
-      return {
-        text: `Timer occurrence check was not pending: occurrence_id=${input.occurrence_id}.`,
-        data: { occurrence_id: input.occurrence_id, completed: false },
-      };
+    if (input.delivery) {
+      delivery = await this.call(input.delivery.tool, {
+        ...input.delivery.input,
+        decision_instance: 'timer',
+      }, { authority: caller.authority, via: caller.trace.via });
+      if (delivery.data?.dry_run) {
+        return {
+          text: `Timer occurrence is not complete: delivery was simulated for occurrence_id=${input.occurrence_id}.`,
+          data: { ...delivery.data, occurrence_id: input.occurrence_id, completed: false },
+        };
+      }
     }
+    await this.timers.markOccurrenceCompleted(input.occurrence_id);
+    this.store.recordActivity({
+      eventKey: `timer-completed:${input.occurrence_id}`,
+      kind: 'timer.completed',
+      status: 'COMPLETED',
+      summary: input.reason ?? 'Timer result delivered.',
+      metadata: {
+        occurrenceId: input.occurrence_id,
+        outcome: input.delivery ? 'delivered' : 'no_delivery_needed',
+        reason: input.reason ?? null,
+        runtime: caller.trace.runtime,
+      },
+    });
     return {
       text: `Timer occurrence completed: occurrence_id=${input.occurrence_id}.`,
-      data: { occurrence_id: input.occurrence_id, completed: true, status: check.status },
+      data: { ...delivery?.data, occurrence_id: input.occurrence_id, completed: true, status: 'completed' },
     };
   }
+
+  // OpenViking long-term memory, the same six tools for every runtime. The
+  // client is built from the instance's own ovConfig on first use, never at
+  // boot, so a daemon without a usable config still starts; tests inject
+  // their own. The tools are not deliveries: no decision, no outbox.
+  ovToolClient() {
+    this.ovTools ??= new OVToolClient({
+      configPath: this.config.openVikingConfigPath, timeoutMs: this.config.openVikingToolTimeoutMs ?? 20_000,
+    });
+    return this.ovTools;
+  }
+
+  // Reads re-check authority after the remote answer, like the other remote
+  // reads: a runtime retired mid-call must not consume the result.
+  async openvikingFind(input, caller) {
+    caller.trace.invoked = true;
+    const result = await this.ovToolClient().find(input);
+    this.assertAuthority(caller.authority);
+    return result;
+  }
+
+  async openvikingSearch(input, caller) {
+    caller.trace.invoked = true;
+    const result = await this.ovToolClient().search(input);
+    this.assertAuthority(caller.authority);
+    return result;
+  }
+
+  async openvikingRead(input, caller) {
+    caller.trace.invoked = true;
+    const result = await this.ovToolClient().read(input);
+    this.assertAuthority(caller.authority);
+    return result;
+  }
+
+  async openvikingList(input, caller) {
+    caller.trace.invoked = true;
+    const result = await this.ovToolClient().list(input);
+    this.assertAuthority(caller.authority);
+    return result;
+  }
+
+  // Writes check authority only before the request leaves, which call() did:
+  // a write the server took must not be reported failed because the runtime
+  // was retired while it landed. Neither is ever retried automatically.
+  async openvikingAddResource(input, caller) {
+    caller.trace.invoked = true;
+    return await this.ovToolClient().addResource({ ...input, workspace: this.config.workspace });
+  }
+
+  // A preference of the person who sent the input decision_id names, kept in
+  // that person's directory (ov-person.mjs). The Core names the person from
+  // the authenticated sender, so the model can neither file a preference under
+  // someone else nor speak for them; what it writes is its statement of what
+  // that person asked, stored with where it came from.
+  async openvikingRemember(input, caller) {
+    const row = this.resolveDecision(input, caller, 'Not remembered');
+    const event = normalizeEvent(JSON.parse(row.event_json));
+    const owner = this.isOwnerEvent(event);
+    const directory = personDirectory(event, { owner });
+    if (!directory) {
+      throw blocked('not_rememberable', `Not remembered: a preference belongs to the person who stated it, and that input has no person behind it. ${NO_ACTION}`);
+    }
+    const person = owner ? { owner: true } : { id: personId(event), directory };
+    const preference = String(input.preference ?? '').trim();
+    if (input.forget !== true && !preference) {
+      throw blocked('invalid_input', 'Pass the preference, or forget: true to remove the one under this topic');
+    }
+    caller.trace.invoked = true;
+    let result;
+    if (input.forget === true) {
+      result = await this.ovToolClient().forgetPreference({ person, topic: input.topic });
+    } else {
+      const who = owner ? 'the owner' : senderLabel(event);
+      const text = `${preference}\n\n(Stated by ${who} via ${event.source}, ${isoMinute(event.createTimeMs).slice(0, 10)}, event=${event.eventId}.)`;
+      result = await this.ovToolClient().setPreference({ person, topic: input.topic, text });
+    }
+    this.onPreferencesChanged?.();
+    return result;
+  }
+
+  // Whether the owner sent an event, by the connector's authenticated identity.
+  isOwnerEvent(event) {
+    if (typeof this.connectors.isOwner === 'function') return this.connectors.isOwner(event);
+    const owner = this.connectors.owner?.(event.connectorInstance ?? event.source);
+    return Boolean(owner?.id && event.senderId && owner.id === event.senderId);
+  }
+
 }

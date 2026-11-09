@@ -56,7 +56,7 @@ class FakeChild extends EventEmitter {
 const helpFlags = [
   '--input-format', '--output-format', '--resume', '--session-id', '--mcp-config',
   '--dangerously-skip-permissions', '--disallowed-tools', '--effort',
-  '--append-system-prompt', '--no-chrome', '--model', '--print', '--permission-prompts',
+  '--append-system-prompt', '--no-chrome', '--model', '--print', '--permission-prompts', '--settings',
 ].join('\n');
 
 function makeStore({ globalOverride = {} } = {}) {
@@ -375,8 +375,12 @@ describe('ClaudeAgent persistent stream-json runtime', () => {
     for (const value of ['--print', '--input-format', 'stream-json', '--output-format', '--mcp-config']) {
       assert.ok(args.includes(value));
     }
-    // User-scope and plugin MCP servers must load alongside personal_agent.
+    // The owner's other MCP servers load alongside personal_agent; OpenViking's
+    // plugin and servers are switched off by one settings layer.
     assert.ok(!args.includes('--strict-mcp-config'));
+    const settings = JSON.parse(args[args.indexOf('--settings') + 1]);
+    assert.equal(settings.enabledPlugins['openviking-memory@openviking'], false);
+    assert.ok(settings.deniedMcpServers.some(({ serverName }) => serverName === 'openviking'));
     const mcpConfig = JSON.parse(fs.readFileSync(args[args.indexOf('--mcp-config') + 1], 'utf8'));
     assert.deepEqual(mcpConfig.mcpServers.personal_agent.args, [
       '/release/packages/daemon/src/actions/mcp.mjs', '--socket', '/data/actions.sock', '--authority', agent.authorityToken,
@@ -456,6 +460,29 @@ describe('ClaudeAgent persistent stream-json runtime', () => {
     child.feed({ type: 'result', subtype: 'success', result: 'corrected' });
     assert.equal(agent.turnInProgress, false);
     assert.equal(store.global().syncedThroughSeq, 4);
+    await agent.stop();
+  });
+
+  it('skips an oversized tool result echo and still completes the turn', async () => {
+    const { agent, persistent, failures, store } = harness();
+    await agent.start();
+    const child = persistent[0];
+    agent.deliver('what is in this picture?', 7);
+    child.feed({ type: 'system', subtype: 'init', session_id: agent.sessionId });
+    child.feed({ type: 'assistant', message: { content: [
+      { type: 'tool_use', id: 'toolu_media', name: 'mcp__personal_agent__get_message_media', input: {} },
+    ] } });
+    const line = `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ tool_use_id: 'toolu_media',
+      type: 'tool_result', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'A'.repeat(5_000_001) } }] }] } })}\n`;
+    for (let index = 0; index < line.length; index += 65_536) child.stdout.emit('data', line.slice(index, index + 65_536));
+    child.feed({ type: 'result', subtype: 'success', result: 'a cat' });
+
+    assert.equal(agent.turnInProgress, false);
+    assert.equal(child.exitCode, null);
+    assert.deepEqual(failures, []);
+    const completed = store.activities.find((activity) => activity.kind === 'agent.tool_completed');
+    assert.equal(completed.metadata.toolId, 'toolu_media');
+    assert.equal(completed.metadata.toolName, 'mcp__personal_agent__get_message_media');
     await agent.stop();
   });
 
@@ -757,4 +784,30 @@ describe('ClaudeAgent persistent stream-json runtime', () => {
     assert.equal(environment.SESSION_ID, undefined);
     assert.equal(environment.LARKSUITE_CLI_PROFILE, 'fixed-profile');
   });
+});
+
+it('Claude owns the bounded-argv prompt file and removes it with its runtime files', async () => {
+  const posix = await import('../src/platform/posix.mjs');
+  const windows = await import('../src/platform/win32.mjs');
+  const policy = 'system policy 中文 & "\n'.repeat(4000);
+  for (const platform of [posix, windows]) {
+    const { agent, calls, persistent } = harness({ agentOptions: { platform } });
+    agent.developerInstructionsText = policy;
+    await agent.start();
+    const args = calls.find(call => call.args.includes('--print')).args;
+    const directory = agent.mcpTempDir;
+    if (platform === windows) {
+      const index = args.indexOf('--append-system-prompt-file');
+      assert.ok(index >= 0);
+      assert.equal(args.includes('--append-system-prompt'), false);
+      assert.equal(fs.readFileSync(args[index + 1], 'utf8'), policy);
+      assert.ok(args.join(' ').length < 32767);
+    } else {
+      assert.equal(args[args.indexOf('--append-system-prompt') + 1], policy);
+      assert.equal(args.includes('--append-system-prompt-file'), false);
+    }
+    persistent[0].finish();
+    await agent.stop();
+    assert.equal(fs.existsSync(directory), false);
+  }
 });

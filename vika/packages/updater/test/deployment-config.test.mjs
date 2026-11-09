@@ -95,6 +95,18 @@ test('loads any number of agents from one absolute deployment manifest', () => {
   });
 });
 
+test('passes timer storage selection from the manifest into the daemon environment', () => {
+  const manifest = validManifest();
+  manifest.env.VIKA_TIMER_STORAGE = 'sqlite';
+  withManifest(manifest, (manifestPath) => {
+    const deployment = loadDeploymentManifest({ VIKA_CONFIG: manifestPath });
+    const env = {};
+    applyDeploymentDaemonEnv(env, deployment);
+    assert.equal(env.VIKA_TIMER_STORAGE, 'sqlite');
+    assert.equal(resolvedDeploymentDaemonEnv(deployment, { VIKA_TIMER_STORAGE: 'ov' }).VIKA_TIMER_STORAGE, 'ov');
+  });
+});
+
 test('defaults the manifest path under HOME and accepts an explicit absolute override', () => {
   assert.equal(
     resolveDeploymentManifestPath({ HOME: '/Users/test' }),
@@ -420,9 +432,12 @@ test('connects mailboxes only together with the email connector, each account fi
 });
 
 
-test('OV recall is opt-in per instance, with actor scope and no Lark profile for Weixin', () => {
+test('OV memory is the daemon\'s; per-line search is opt-in; any OV plugin that loads stays inert; no Lark profile for Weixin', () => {
   const manifest = validManifest();
   manifest.agents[1].ovAutoRecall = true;
+  // Retired options: ignored, never an error.
+  manifest.agents[1].ovRecallScope = 'actor';
+  manifest.agents[1].ovRemember = true;
   manifest.agents[2].channel = 'weixin';
   manifest.agents[2].connectors = ['weixin'];
   delete manifest.agents[2].profile;
@@ -437,13 +452,32 @@ test('OV recall is opt-in per instance, with actor scope and no Lark profile for
     assert.equal(selectDeploymentAgent(deployment, 'alpha').ovAutoRecall, false);
     applyDeploymentAgentEnv(env, deployment, 'alpha');
     assert.equal(env.OPENVIKING_CLI_CONFIG_FILE, '/srv/vika/ov/alpha.json');
-    assert.equal(env.OPENVIKING_MEMORY_ENABLED, '1');
+    assert.equal(env.OPENVIKING_MEMORY_ENABLED, '0');
     assert.equal(env.OPENVIKING_AUTO_RECALL, '0');
+    assert.equal(env.VIKA_OV_AUTO_RECALL, 'false');
+    assert.equal(env.VIKA_OV_RECALL_SCOPE, undefined);
+    assert.equal(env.VIKA_OV_REMEMBER, undefined);
+    // Vika owns OV: a plugin that loads anyway writes and recalls nothing.
+    assert.equal(env.OPENVIKING_AUTO_CAPTURE, '0');
+    assert.equal(env.OPENVIKING_AUTO_COMMIT_ON_COMPACT, '0');
+    assert.equal(env.OPENVIKING_TAKEOVER, '0');
+    assert.equal(env.OPENVIKING_WORKSPACE_PEER, '0');
+    assert.equal(env.OPENVIKING_RECALL_PEER_SCOPE, 'all');
+    // Plugin state and queued writes stay inside this instance.
+    assert.equal(env.OPENVIKING_HOME, '/srv/vika/data/alpha/openviking');
+    assert.equal(env.OPENVIKING_STATE_DIR, '/srv/vika/data/alpha/openviking/state');
+    assert.equal(env.OPENVIKING_HOOK_STATE_DIR, '/srv/vika/data/alpha/openviking/hook-state');
+    assert.equal(env.OPENVIKING_CODEX_STATE_DIR, '/srv/vika/data/alpha/openviking/codex-plugin-state');
+    assert.equal(env.OPENVIKING_PENDING_DIR, '/srv/vika/data/alpha/openviking/pending');
+    assert.equal(env.OPENVIKING_RECALL_LEDGER_DIR, '/srv/vika/data/alpha/openviking/recall-ledger');
     applyDeploymentAgentEnv(env, deployment, 'beta');
     assert.equal(env.OPENVIKING_CLI_CONFIG_FILE, '/srv/vika/ov/beta.json');
-    assert.equal(env.OPENVIKING_MEMORY_ENABLED, '1');
-    assert.equal(env.OPENVIKING_AUTO_RECALL, '1');
-    assert.equal(env.OPENVIKING_RECALL_PEER_SCOPE, 'actor');
+    assert.equal(env.OPENVIKING_MEMORY_ENABLED, '0');
+    // Search on: the daemon searches (ov-recall.mjs); the plugins' own stays off.
+    assert.equal(env.OPENVIKING_AUTO_RECALL, '0');
+    assert.equal(env.VIKA_OV_AUTO_RECALL, 'true');
+    assert.equal(selectDeploymentAgent(deployment, 'beta').ovRecallScope, undefined);
+    assert.equal(env.OPENVIKING_PENDING_DIR, '/srv/vika/data/beta/openviking/pending');
     assert.equal(env.LARKSUITE_CLI_PROFILE, 'cli_beta');
     applyDeploymentAgentEnv(env, deployment, 'gamma');
     assert.equal(selectDeploymentAgent(deployment, 'gamma').profile, null);
@@ -452,17 +486,31 @@ test('OV recall is opt-in per instance, with actor scope and no Lark profile for
   });
 });
 
-test('explicit silence is opt-in per instance and always pinned in the daemon env', () => {
+test('explicit silence is on by default except on Ark, an explicit false opts out, and it is always pinned in the daemon env', () => {
   const manifest = validManifest();
-  manifest.agents[1].explicitSilence = true;
+  delete manifest.agents[0].explicitSilence;
+  manifest.agents[1].explicitSilence = false;
   withManifest(manifest, (manifestPath) => {
-    const env = { VIKA_CONFIG: manifestPath, VIKA_EXPLICIT_SILENCE: 'true' };
+    const env = { VIKA_CONFIG: manifestPath, VIKA_EXPLICIT_SILENCE: 'false' };
+    const deployment = loadDeploymentManifest(env);
+    assert.notEqual(selectDeploymentAgent(deployment, 'alpha').model, 'ark');
+    assert.equal(selectDeploymentAgent(deployment, 'alpha').explicitSilence, true);
+    assert.equal(selectDeploymentAgent(deployment, 'beta').explicitSilence, false);
+    applyDeploymentAgentEnv(env, deployment, 'alpha');
+    assert.equal(env.VIKA_EXPLICIT_SILENCE, 'true');
+    applyDeploymentAgentEnv(env, deployment, 'beta');
+    assert.equal(env.VIKA_EXPLICIT_SILENCE, 'false');
+  });
+  // Ark has no Core tools to offer stay_silent through: off unless set.
+  const ark = validManifest();
+  Object.assign(ark.agents[0], { model: 'ark', volcSessionId: 'sess', volcEnvironmentId: 'env' });
+  delete ark.agents[0].explicitSilence;
+  withManifest(ark, (manifestPath) => {
+    const env = { VIKA_CONFIG: manifestPath };
     const deployment = loadDeploymentManifest(env);
     assert.equal(selectDeploymentAgent(deployment, 'alpha').explicitSilence, false);
     applyDeploymentAgentEnv(env, deployment, 'alpha');
     assert.equal(env.VIKA_EXPLICIT_SILENCE, 'false');
-    applyDeploymentAgentEnv(env, deployment, 'beta');
-    assert.equal(env.VIKA_EXPLICIT_SILENCE, 'true');
   });
   const broken = validManifest();
   broken.agents[0].explicitSilence = 'true';
@@ -487,6 +535,39 @@ test('staged replies are opt-in per instance and always pinned in the daemon env
   broken.agents[0].stagedReplies = 1;
   withManifest(broken, (manifestPath) => {
     assert.throws(() => loadDeploymentManifest({ VIKA_CONFIG: manifestPath }), /agents\[0\]\.stagedReplies must be a boolean/);
+  });
+});
+
+test('Lark message access is the owner\'s unless an instance keeps to the bot\'s chats, and only a Lark instance has it', () => {
+  const manifest = validManifest();
+  manifest.agents[1].larkMessageAccess = 'bot';
+  manifest.agents[2].channel = 'weixin';
+  manifest.agents[2].connectors = ['weixin'];
+  delete manifest.agents[2].profile;
+  withManifest(manifest, (manifestPath) => {
+    const env = { VIKA_CONFIG: manifestPath, VIKA_LARK_MESSAGE_ACCESS: 'bot' };
+    const deployment = loadDeploymentManifest(env);
+    assert.equal(selectDeploymentAgent(deployment, 'alpha').larkMessageAccess, 'owner');
+    applyDeploymentAgentEnv(env, deployment, 'alpha');
+    assert.equal(env.VIKA_LARK_MESSAGE_ACCESS, 'owner');
+    applyDeploymentAgentEnv(env, deployment, 'beta');
+    assert.equal(env.VIKA_LARK_MESSAGE_ACCESS, 'bot');
+    applyDeploymentAgentEnv(env, deployment, 'gamma');
+    assert.equal(selectDeploymentAgent(deployment, 'gamma').larkMessageAccess, null);
+    assert.equal(env.VIKA_LARK_MESSAGE_ACCESS, undefined);
+  });
+  const wrong = validManifest();
+  wrong.agents[0].larkMessageAccess = 'everyone';
+  withManifest(wrong, (manifestPath) => {
+    assert.throws(() => loadDeploymentManifest({ VIKA_CONFIG: manifestPath }), /agents\[0\]\.larkMessageAccess must be owner or bot/);
+  });
+  const elsewhere = validManifest();
+  elsewhere.agents[2].channel = 'weixin';
+  elsewhere.agents[2].connectors = ['weixin'];
+  delete elsewhere.agents[2].profile;
+  elsewhere.agents[2].larkMessageAccess = 'bot';
+  withManifest(elsewhere, (manifestPath) => {
+    assert.throws(() => loadDeploymentManifest({ VIKA_CONFIG: manifestPath }), /agents\[2\]\.larkMessageAccess is only used by the lark connector/);
   });
 });
 

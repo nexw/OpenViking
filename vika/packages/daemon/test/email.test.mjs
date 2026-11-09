@@ -8,8 +8,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { ActionService } from '../src/actions/service.mjs';
-import { MailArchive, chunkOffset, needsChunks, readTarget } from '../src/email/archive.mjs';
-import { EmailClient, accountTag } from '../src/email/client.mjs';
+import { MailArchive, chunkOffset, needsChunks, readTarget, mailFolder } from '../src/email/archive.mjs';
+import { EmailClient, accountTag, loadAccount } from '../src/email/client.mjs';
+import { mailboxIdentity, mailboxWireName } from '../src/email/mailbox.mjs';
 import { EmailState } from '../src/email/state.mjs';
 import { fetchAttributes, parseResponse } from '../src/email/imap.mjs';
 import { buildReply, htmlToText, isOwnMessageId, parseAddresses, parseMail, replyMessageId } from '../src/email/mime.mjs';
@@ -35,8 +36,10 @@ function mail({ from = 'Alice <alice@example.com>', to = ME, subject = 'Thursday
 // A scripted IMAP server: the commands it was sent, the mailbox, and IDLE
 // sessions to wake with `deliver(raw)`.
 async function fakeImap(t, { mails = [], uidValidity = 1, gmail = true } = {}) {
-  const state = { mails: mails.map((raw, index) => ({ uid: index + 1, raw })), commands: [], idlers: new Set(), sockets: new Set() };
+  const state = { folders: new Map(), mails: mails.map((raw, index) => ({ uid: index + 1, raw })), unavailable: new Set(), disconnectOnExamine: new Set(), validities: new Map(), commands: [], idlers: new Set(), sockets: new Set() };
+  state.folders.set('INBOX', state.mails);
   const server = net.createServer((socket) => {
+    socket.mailbox = 'INBOX';
     state.sockets.add(socket);
     socket.on('close', () => { state.sockets.delete(socket); state.idlers.delete(socket); });
     socket.on('error', () => {});
@@ -62,7 +65,17 @@ async function fakeImap(t, { mails = [], uidValidity = 1, gmail = true } = {}) {
         const command = line.slice(space + 1);
         state.commands.push(command.startsWith('LOGIN ') ? 'LOGIN' : command);
         const ok = (text = 'done') => socket.write(`${tag} OK ${text}\r\n`);
-        const uidNext = (state.mails.at(-1)?.uid ?? 0) + 1;
+        if (command.startsWith('EXAMINE ')) {
+          if (state.disconnectOnExamine.has(JSON.parse(command.slice(8)))) { socket.destroy(); return; }
+          if (state.unavailable.has(JSON.parse(command.slice(8)))) {
+            socket.write(`${tag} NO no such mailbox\r\n`);
+            continue;
+          }
+          socket.mailbox = JSON.parse(command.slice(8));
+          if (!state.folders.has(socket.mailbox)) state.folders.set(socket.mailbox, []);
+        }
+        const selected = state.folders.get(socket.mailbox) ?? [];
+        const uidNext = (selected.at(-1)?.uid ?? 0) + 1;
         let match;
         if (command.startsWith('LOGIN ')) {
           if (command.includes(`"${PASSWORD}"`)) ok();
@@ -70,22 +83,28 @@ async function fakeImap(t, { mails = [], uidValidity = 1, gmail = true } = {}) {
         } else if (command === 'CAPABILITY') {
           socket.write(`* CAPABILITY IMAP4rev1 IDLE${gmail ? ' X-GM-EXT-1' : ''}\r\n`);
           ok();
+        } else if (command === 'LIST "" "*"') {
+          if (state.listFailure) { socket.write(`${tag} NO temporary LIST failure\r\n`); continue; }
+          for (const name of state.folders.keys()) {
+            socket.write(`* LIST () "/" ${JSON.stringify(mailboxWireName(name))}\r\n`);
+          }
+          ok();
         } else if (command.startsWith('EXAMINE ')) {
-          socket.write(`* ${state.mails.length} EXISTS\r\n* OK [UIDVALIDITY ${uidValidity}] ok\r\n* OK [UIDNEXT ${uidNext}] ok\r\n`);
-          socket.known = state.mails.length;
+          socket.write(`* ${selected.length} EXISTS\r\n* OK [UIDVALIDITY ${state.validities.get(socket.mailbox) ?? uidValidity}] ok\r\n* OK [UIDNEXT ${uidNext}] ok\r\n`);
+          socket.known = selected.length;
           ok('[READ-ONLY] EXAMINE completed');
         } else if ((match = /^UID SEARCH UID (\d+):\*$/.exec(command))) {
           const from = Number(match[1]);
-          const found = state.mails.filter((item) => item.uid >= from).map((item) => item.uid);
+          const found = selected.filter((item) => item.uid >= from).map((item) => item.uid);
           // RFC 3501: `n:*` always includes the newest message.
-          if (found.length === 0 && state.mails.length) found.push(state.mails.at(-1).uid);
+          if (found.length === 0 && selected.length) found.push(selected.at(-1).uid);
           socket.write(`* SEARCH${found.map((uid) => ` ${uid}`).join('')}\r\n`);
           ok();
         } else if ((match = /^UID FETCH ([\d,]+) \((.*)\)$/.exec(command))) {
           for (const uid of match[1].split(',').map(Number)) {
-            const index = state.mails.findIndex((item) => item.uid === uid);
+            const index = selected.findIndex((item) => item.uid === uid);
             if (index < 0) continue;
-            const { raw } = state.mails[index];
+            const { raw } = selected[index];
             const fields = [`UID ${uid}`, `RFC822.SIZE ${raw.length}`];
             if (match[2].includes('X-GM-THRID')) fields.push('X-GM-THRID 9001');
             if (match[2].includes('INTERNALDATE')) fields.push('INTERNALDATE "13-Oct-2026 08:10:00 +0000"');
@@ -104,8 +123,8 @@ async function fakeImap(t, { mails = [], uidValidity = 1, gmail = true } = {}) {
           state.idlers.add(socket);
           socket.write('+ idling\r\n');
           // Like a real server, tell a client that was busy when mail arrived.
-          if (state.mails.length !== socket.known) {
-            socket.known = state.mails.length;
+          if (selected.length !== socket.known) {
+            socket.known = selected.length;
             socket.write(`* ${socket.known} EXISTS\r\n`);
           }
         } else if (command === 'NOOP' || command.startsWith('ID ')) {
@@ -128,10 +147,13 @@ async function fakeImap(t, { mails = [], uidValidity = 1, gmail = true } = {}) {
   return {
     state,
     port: server.address().port,
-    deliver(raw) {
-      state.mails.push({ uid: (state.mails.at(-1)?.uid ?? 0) + 1, raw });
+    deliver(raw, mailbox = 'INBOX') {
+      if (!state.folders.has(mailbox)) state.folders.set(mailbox, []);
+      const selected = state.folders.get(mailbox);
+      selected.push({ uid: (selected.at(-1)?.uid ?? 0) + 1, raw });
       for (const socket of state.idlers) {
-        socket.known = state.mails.length;
+        if (socket.mailbox !== mailbox) continue;
+        socket.known = selected.length;
         socket.write(`* ${socket.known} EXISTS\r\n`);
       }
     },
@@ -188,7 +210,7 @@ function plainTls(options) {
   return socket;
 }
 
-async function setup(t, { mails = [], password = PASSWORD, gmail = true, instance = undefined, archive = null, attachmentWaitMs = undefined } = {}) {
+async function setup(t, { mails = [], password = PASSWORD, gmail = true, instance = undefined, archive = null, attachmentWaitMs = undefined, pollMs = undefined } = {}) {
   const imap = await fakeImap(t, { mails, gmail });
   const smtp = await fakeSmtp(t);
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'email-'));
@@ -199,13 +221,15 @@ async function setup(t, { mails = [], password = PASSWORD, gmail = true, instanc
   const config = { emailConfigFile: configFile, dataDir: directory, retentionMs: 86_400_000, ...(instance ? { instance } : {}) };
   const clients = [];
   const start = async () => {
-    const client = new EmailClient(config, null, quiet, { connectTls: plainTls, archive, attachmentWaitMs });
+    const client = new EmailClient(config, null, quiet, { connectTls: plainTls, archive, attachmentWaitMs, pollMs, discoveryMs: pollMs, reconnectMs: 10 });
     clients.push(client);
     await client.preflight();
     const events = [];
     const exits = [];
     client.startSubscription((line) => events.push(normalizeEvent(JSON.parse(line))), (exit) => exits.push(exit));
-    await until(() => imap.state.idlers.size === 1);
+    const names = client.account.imap.mailboxes;
+    await until(() => client.account.imap.discovery ? imap.state.commands.filter((command) => command === 'LIST "" "*"').length >= 2 : names.length === 1 ? imap.state.idlers.size === 1
+      : names.filter((name) => !imap.state.unavailable.has(name)).every((name) => client.state.cursor(`${TAG}:${name}`)));
     return { client, events, exits };
   };
   t.after(async () => { for (const client of clients) await client.stop().catch(() => {}); });
@@ -221,6 +245,219 @@ async function until(check, timeoutMs = 3_000) {
 }
 
 describe('email connector', () => {
+  it('isolates a configured folder from INBOX while retaining old mail and cursor identities', async (t) => {
+    const bodies = new Map();
+    const archive = {
+      folder: (id) => mailFolder('viking://~/resources/emails', id),
+      storeAttachments: async () => [],
+      write: async (uri, body) => { bodies.set(uri, body); return uri; },
+      chunk: async () => {},
+    };
+    const { imap, start, config } = await setup(t, { archive });
+    const first = await start();
+    imap.deliver(mail());
+    await until(() => first.events.length === 1);
+    await first.client.stopSubscription();
+    const account = JSON.parse(fs.readFileSync(config.emailConfigFile, 'utf8'));
+    account.imap.mailbox = 'Projects';
+    fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+    const second = await start();
+    assert.ok(imap.state.commands.includes('EXAMINE "Projects"'));
+    imap.deliver(mail(), 'Projects');
+    await until(() => second.events.length === 1);
+    const a = first.events[0].messageId;
+    const b = second.events[0].messageId;
+    assert.equal(a, `mail:${TAG}:1:1`);
+    assert.equal(b, `mail:${mailboxIdentity(TAG, 'Projects', 1, 1)}`);
+    assert.notEqual(first.events[0].eventId, second.events[0].eventId);
+    assert.ok(second.client.state.mail(a));
+    assert.ok(second.client.state.mail(b));
+    assert.equal(second.events[0].data.mailbox, 'Projects');
+    assert.deepEqual(second.client.state.cursor(`${TAG}:INBOX`), { uidValidity: 1, lastUid: 1 });
+    const root = 'viking://~/resources/emails';
+    const oldFolder = mailFolder(root, a);
+    const newFolder = mailFolder(root, b);
+    assert.equal(oldFolder, `${root}/${TAG}-1-1`);
+    assert.notEqual(oldFolder, newFolder);
+    assert.match(bodies.get(`${newFolder}/body.md`), /IMAP folder: Projects/);
+    for (const folder of [oldFolder, newFolder]) {
+      assert.deepEqual(readTarget(root, `${folder}/body.md`), { target: `${folder}/body.md` });
+    }
+  });
+
+  it('polls folders independently, isolates missing folders, resumes and resets only the changed folder', async (t) => {
+    const { imap, config, start } = await setup(t, { pollMs: 20 });
+    const account = JSON.parse(fs.readFileSync(config.emailConfigFile, 'utf8'));
+    account.imap.mailboxes = ['INBOX', 'Missing', 'Projects'];
+    fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+    imap.state.unavailable.add('Missing');
+    const first = await start();
+    imap.deliver(mail(), 'INBOX');
+    imap.deliver(mail(), 'Projects');
+    await until(() => first.events.length === 2);
+    assert.equal(new Set(first.events.map((event) => event.messageId)).size, 2);
+    assert.equal(imap.state.idlers.size, 0);
+    assert.equal(first.exits.length, 0);
+    for (let i = 0; i < imap.state.commands.length - 1; i += 1) {
+      if (imap.state.commands[i] === 'EXAMINE "Missing"') assert.doesNotMatch(imap.state.commands[i + 1], /^UID (SEARCH|FETCH)/);
+    }
+    await first.client.stopSubscription();
+    imap.deliver(mail({ id: 'after-stop@example.com' }), 'Projects');
+    const second = await start();
+    await until(() => second.events.length === 1);
+    assert.equal(second.events[0].data.mailbox, 'Projects');
+    imap.state.validities.set('Projects', 2);
+    await until(() => second.client.state.cursor(`${TAG}:Projects`)?.uidValidity === 2);
+    assert.deepEqual(second.client.state.cursor(`${TAG}:INBOX`), { uidValidity: 1, lastUid: 1 });
+    imap.deliver(mail({ id: 'after-reset@example.com' }), 'Projects');
+    imap.deliver(mail({ id: 'inbox-continues@example.com' }));
+    await until(() => second.events.length === 3);
+    await second.client.stopSubscription();
+    await until(() => imap.state.sockets.size === 0);
+  });
+
+  it('reconnects after a lost socket without losing per-folder cursors', async (t) => {
+    const { imap, config, start } = await setup(t, { pollMs: 20 });
+    const account = JSON.parse(fs.readFileSync(config.emailConfigFile, 'utf8'));
+    account.imap.mailboxes = ['INBOX', 'Projects'];
+    fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+    const running = await start();
+    for (const socket of imap.state.sockets) socket.destroy();
+    imap.deliver(mail(), 'Projects');
+    await until(() => running.events.length === 1);
+    assert.equal(running.events[0].data.mailbox, 'Projects');
+    assert.equal(running.exits.length, 0);
+    await running.client.stopSubscription();
+    await until(() => imap.state.sockets.size === 0);
+  });
+
+  it('a folder that repeatedly disconnects cannot starve the following folder', async (t) => {
+    const { imap, config, start } = await setup(t, { pollMs: 20 });
+    const account = JSON.parse(fs.readFileSync(config.emailConfigFile, 'utf8'));
+    account.imap.mailboxes = ['INBOX', 'Broken', 'Projects'];
+    fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+    const running = await start();
+    imap.state.disconnectOnExamine.add('Broken');
+    imap.deliver(mail(), 'Projects');
+    await until(() => running.events.length === 1);
+    imap.deliver(mail({ id: 'second@example.com' }), 'Projects');
+    await until(() => running.events.length === 2);
+    assert.ok(imap.state.commands.filter((command) => command === 'LOGIN').length >= 3);
+    assert.equal(running.exits.length, 0);
+  });
+
+  it('validates and deduplicates explicit mailbox sets and polling intervals', async (t) => {
+    const { config } = await setup(t);
+    const account = JSON.parse(fs.readFileSync(config.emailConfigFile, 'utf8'));
+    account.imap.mailboxes = ['inbox', 'INBOX', 'Projects', 'projects'];
+    fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+    assert.deepEqual(loadAccount(config.emailConfigFile).imap.mailboxes, ['INBOX', 'Projects', 'projects']);
+    for (const names of [[], 'INBOX', [null], Array(101).fill('INBOX')]) {
+      account.imap.mailboxes = names;
+      fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+      assert.throws(() => loadAccount(config.emailConfigFile), /imap.mailbox/);
+    }
+    account.imap.mailboxes = ['INBOX'];
+    account.imap.mailbox = 'INBOX';
+    fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+    assert.throws(() => loadAccount(config.emailConfigFile), /either/);
+    delete account.imap.mailbox;
+    account.imap.pollIntervalSeconds = 0;
+    fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+    assert.throws(() => loadAccount(config.emailConfigFile), /pollIntervalSeconds/);
+  });
+
+  it('discovers new folders, excludes subtrees, and preserves its snapshot when LIST fails', async (t) => {
+    const { imap, config, start } = await setup(t, { pollMs: 20 });
+    imap.state.folders.set('Work', []);
+    imap.state.folders.set('Work/Trash', []);
+    imap.state.folders.set('Work/Trash/Old', []);
+    imap.state.folders.set('Workshops', []);
+    const account = JSON.parse(fs.readFileSync(config.emailConfigFile, 'utf8'));
+    account.imap.discovery = { roots: ['Work'], exclude: ['Work/Trash'] };
+    fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+    const running = await start();
+    await until(() => running.client.state.cursor(`${TAG}:Work`));
+    assert.equal(running.client.state.cursor(`${TAG}:Workshops`), null);
+    assert.equal(running.client.state.cursor(`${TAG}:Work/Trash`), null);
+    assert.equal(running.client.state.cursor(`${TAG}:Work/Trash/Old`), null);
+    imap.deliver(mail(), 'Work/New'); // first discovery skips historical messages
+    await until(() => running.client.state.cursor(`${TAG}:Work/New`)?.lastUid === 1);
+    assert.equal(running.events.length, 0);
+    imap.deliver(mail({ id: 'new-folder@example.com' }), 'Work/New');
+    await until(() => running.events.length === 1);
+    imap.state.listFailure = true;
+    imap.deliver(mail({ id: 'list-failed@example.com' }), 'Work');
+    await until(() => running.events.length === 2);
+    assert.equal(running.events[1].data.mailbox, 'Work');
+    assert.equal(running.exits.length, 0);
+    imap.state.listFailure = false;
+    // A removed folder stops being selected but its cursor stays for reappearance.
+    const saved = imap.state.folders.get('Work/New');
+    imap.state.folders.delete('Work/New');
+    imap.state.unavailable.add('Work/New');
+    const lists = imap.state.commands.filter((command) => command === 'LIST "" "*"').length;
+    await until(() => imap.state.commands.filter((command) => command === 'LIST "" "*"').length > lists);
+    assert.equal(running.client.state.cursor(`${TAG}:Work/New`).lastUid, 2);
+    imap.state.unavailable.delete('Work/New');
+    imap.state.folders.set('Work/New', saved);
+    imap.deliver(mail({ id: 'reappeared@example.com' }), 'Work/New');
+    await until(() => running.events.length === 3);
+    assert.equal(running.events[2].data.mailbox, 'Work/New');
+  });
+
+  it('discovers from an empty list and retains a usable snapshot if the folder limit is exceeded', async (t) => {
+    const { imap, config, start } = await setup(t, { pollMs: 20 });
+    imap.state.folders.clear();
+    const account = JSON.parse(fs.readFileSync(config.emailConfigFile, 'utf8'));
+    account.imap.discovery = {};
+    fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+    const running = await start();
+    imap.state.folders.set('Later', []);
+    await until(() => running.client.state.cursor(`${TAG}:Later`));
+    for (let i = 0; i < 101; i += 1) imap.state.folders.set(`Extra${i}`, []);
+    const lists = imap.state.commands.filter((command) => command === 'LIST "" "*"').length;
+    await until(() => imap.state.commands.filter((command) => command === 'LIST "" "*"').length > lists);
+    imap.deliver(mail(), 'Later');
+    await until(() => running.events.length === 1);
+    assert.equal(running.events[0].data.mailbox, 'Later');
+    assert.equal(running.client.state.cursor(`${TAG}:Extra0`), null);
+  });
+
+  it('rejects ambiguous or invalid discovery configuration', async (t) => {
+    const { config } = await setup(t);
+    const account = JSON.parse(fs.readFileSync(config.emailConfigFile, 'utf8'));
+    for (const discovery of [true, [], null, { roots: 'Work' }, { exclude: [null] }, { refreshIntervalSeconds: 0 }]) {
+      account.imap.discovery = discovery;
+      fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+      assert.throws(() => loadAccount(config.emailConfigFile), /discovery|mailbox/);
+    }
+    account.imap.discovery = {};
+    account.imap.mailboxes = ['INBOX'];
+    fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+    assert.throws(() => loadAccount(config.emailConfigFile), /cannot be combined/);
+  });
+
+  it('validates mailbox configuration and encodes rev1 mailbox names', async (t) => {
+    const { config } = await setup(t);
+    const account = JSON.parse(fs.readFileSync(config.emailConfigFile, 'utf8'));
+    assert.equal(loadAccount(config.emailConfigFile).imap.mailbox, 'INBOX');
+    for (const [value, expected] of [['inbox', 'INBOX'], [' Projects ', ' Projects '], ['收件箱', '收件箱']]) {
+      account.imap.mailbox = value;
+      fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+      assert.equal(loadAccount(config.emailConfigFile).imap.mailbox, expected);
+    }
+    for (const value of ['', null, [], 'x\r\nLOGIN', 'x\u0000']) {
+      account.imap.mailbox = value;
+      fs.writeFileSync(config.emailConfigFile, JSON.stringify(account));
+      assert.throws(() => loadAccount(config.emailConfigFile), /imap.mailbox/);
+    }
+    assert.equal(mailboxWireName('台北&'), '&U,BTFw-&-');
+    assert.equal(mailboxWireName('台北&', true), '台北&');
+    assert.notEqual(mailboxIdentity(TAG, 'Projects', 1, 1), mailboxIdentity(TAG, 'projects', 1, 1));
+    assert.equal(mailboxIdentity(TAG, 'inbox', 1, 1), `${TAG}:1:1`);
+  });
+
   it('reports mail that arrives after it starts, read-only, and skips its own replies and auto-replies', async (t) => {
     const { imap, start } = await setup(t, { mails: [mail({ id: 'old-1@example.com' }), mail({ id: 'old-2@example.com' })] });
     const { events, exits } = await start();
@@ -428,6 +665,7 @@ const file = (name, type, body, { inline = false, base64 = true } = {}) => ({
 describe('mail in OpenViking', () => {
   const ROOT = 'viking://user/owner/resources/emails';
   const FOLDER = `${ROOT}/${TAG}-1-1`;
+  const LINK_FOLDER = `viking://~/resources/emails/${TAG}-1-1`;
   const TEXT = 'Revenue grew twelve percent. '.repeat(30).trim();
   const q3 = () => multipartMail({ text: TEXT, parts: [
     file('report.pdf', 'application/pdf', '%PDF-1.4 revenue'),
@@ -465,18 +703,18 @@ describe('mail in OpenViking', () => {
     // The runtime gets who wrote, where the mail is, and the start of the text.
     const lines = event.content.split('\n');
     assert.deepEqual(lines.slice(0, 3), ['From: Alice <alice@example.com>', `To: ${ME}`,
-      `[mail stored: ${FOLDER}/body.md; the first 500 of its ${TEXT.length} characters are below]`]);
+      `[mail stored: ${LINK_FOLDER}/body.md; the first 500 of its ${TEXT.length} characters are below]`]);
     assert.deepEqual(lines.slice(3, 8).map((line) => line.replace(/ \([^)]*\)/, '')), [
-      `[attachment 01 report.pdf: ${FOLDER}/attachments/01-report.pdf]`,
-      `[attachment 02 invite.ics: ${FOLDER}/attachments/02-invite.ics]`,
-      `[attachment 03 forwarded.eml: ${FOLDER}/attachments/03-forwarded.eml]`,
+      `[attachment 01 report.pdf: ${LINK_FOLDER}/attachments/01-report.pdf]`,
+      `[attachment 02 invite.ics: ${LINK_FOLDER}/attachments/02-invite.ics]`,
+      `[attachment 03 forwarded.eml: ${LINK_FOLDER}/attachments/03-forwarded.eml]`,
       '[attachment 04 archive.zip: not stored, OpenViking does not read this type]',
       '[attachment 05 broken.pdf: not stored, OpenViking could not read it]',
     ]);
-    assert.equal(lines[3], `[attachment 01 report.pdf (application/pdf, 16 B): ${FOLDER}/attachments/01-report.pdf]`);
+    assert.equal(lines[3], `[attachment 01 report.pdf (application/pdf, 16 B): ${LINK_FOLDER}/attachments/01-report.pdf]`);
     assert.deepEqual(lines.slice(8), ['', `${TEXT.slice(0, 500)}…`]);
     assert.deepEqual(event.attachments, []);
-    assert.equal(event.data.archive.body, `${FOLDER}/body.md`);
+    assert.equal(event.data.archive.body, `${LINK_FOLDER}/body.md`);
     assert.deepEqual(event.data.archive.attachments.map(({ id, status }) => [id, status]),
       [['01', 'stored'], ['02', 'stored'], ['03', 'stored'], ['04', 'skipped'], ['05', 'failed']]);
 
@@ -484,7 +722,7 @@ describe('mail in OpenViking', () => {
     const body = ov.state.files.get(`${FOLDER}/body.md`);
     assert.match(body, /^# Q3 report\n\n- From: Alice <alice@example\.com>\n- To: me@example\.com\n- Date: 2026-10-13T08:10:00\.000Z\n/);
     assert.ok(body.includes(`- Message: mail:${TAG}:1:1`));
-    assert.ok(body.includes(`- 01 report.pdf (application/pdf, 16 B): ${FOLDER}/attachments/01-report.pdf`));
+    assert.ok(body.includes(`- 01 report.pdf (application/pdf, 16 B): ${LINK_FOLDER}/attachments/01-report.pdf`));
     assert.ok(body.includes('- 1 inline image in the body, not stored'));
     assert.ok(body.endsWith(`## Body\n\n${TEXT}\n`));
     assert.equal(ov.state.files.get(`${FOLDER}/attachments/01-report.pdf/full/report.md`), 'parsed report.pdf: %PDF-1.4 revenue');
@@ -494,15 +732,15 @@ describe('mail in OpenViking', () => {
 
     // Text first, then vectors only: nothing asks OV for an LLM summary.
     const writes = ov.state.requests.filter(({ route }) => route === 'POST /api/v1/content/write');
-    assert.deepEqual(writes.map(({ body: { uri, mode, wait, processing_mode: processing } }) => [uri.slice(FOLDER.length), mode, wait, processing]), [
+    assert.deepEqual(writes.map(({ body: { uri, mode, wait, processing_mode: processing } }) => [uri.slice(LINK_FOLDER.length), mode, wait, processing]), [
       ['/attachments/02-invite.ics/full/invite.txt', 'replace', false, 'vectors_only'],
       ['/attachments/03-forwarded.eml/full/message.md', 'replace', false, 'vectors_only'],
       ['/body.md', 'replace', false, 'vectors_only'],
     ]);
     const added = ov.state.requests.filter(({ route }) => route === 'POST /api/v1/resources').map(({ body: request }) => request);
     assert.deepEqual(added.map(({ to, source_name: name, wait, processing_mode: processing, args }) => [to, name, wait, processing, args]), [
-      [`${FOLDER}/attachments/01-report.pdf/full`, 'report.pdf', false, 'vectors_only', { parse_mode: 'no_split' }],
-      [`${FOLDER}/attachments/05-broken.pdf/full`, 'broken.pdf', false, 'vectors_only', { parse_mode: 'no_split' }],
+      [`${LINK_FOLDER}/attachments/01-report.pdf/full`, 'report.pdf', false, 'vectors_only', { parse_mode: 'no_split' }],
+      [`${LINK_FOLDER}/attachments/05-broken.pdf/full`, 'broken.pdf', false, 'vectors_only', { parse_mode: 'no_split' }],
     ]);
     assert.deepEqual([...ov.state.uploads.values()].map(({ name, type }) => [name, type]),
       [['report.pdf', 'application/pdf'], ['broken.pdf', 'application/pdf']]);
@@ -529,7 +767,7 @@ describe('mail in OpenViking', () => {
     const { service, actions, read } = reader(t, { ov, config, event: events[0] });
     assert.ok(actions.tools().some((tool) => tool.name === 'read_email'));
     assert.ok(!service(['lark']).tools().some((tool) => tool.name === 'read_email'));
-    assert.match(formatInboundLine(events[0]), /\[mail stored: viking:\/\/user\/owner\/resources\/emails\//);
+    assert.match(formatInboundLine(events[0]), /\[mail stored: viking:\/\/~\/resources\/emails\//);
 
     const messageId = `mail:${TAG}:1:1`;
     const first = await read({ message_id: messageId, max_chars: 1000 });
@@ -588,9 +826,9 @@ describe('mail in OpenViking', () => {
     // The whole text is imported once more, split by OV, for recall alone.
     const added = ov.state.requests.filter(({ route }) => route === 'POST /api/v1/resources').map(({ body: request }) => request);
     assert.deepEqual(added.map(({ to, source_name: name, processing_mode: processing, args }) => [to, name, processing, args]), [
-      [`${attachment}/full`, 'big.pdf', 'vectors_only', { parse_mode: 'no_split' }],
-      [`${attachment}/chunks`, 'big.md', 'vectors_only', undefined],
-      [`${FOLDER}/chunks`, 'body.md', 'vectors_only', undefined],
+      [`${LINK_FOLDER}/attachments/01-big.pdf/full`, 'big.pdf', 'vectors_only', { parse_mode: 'no_split' }],
+      [`${LINK_FOLDER}/attachments/01-big.pdf/chunks`, 'big.md', 'vectors_only', undefined],
+      [`${LINK_FOLDER}/chunks`, 'body.md', 'vectors_only', undefined],
     ]);
     const uploads = [...ov.state.uploads.values()];
     assert.deepEqual(uploads.map(({ name, type }) => [name, type]),
@@ -600,7 +838,7 @@ describe('mail in OpenViking', () => {
     const chunks = [...ov.state.files.keys()].filter((uri) => uri.startsWith(`${attachment}/chunks/`));
     assert.ok(chunks.length >= 2, 'the attachment is split');
     // The event and the read tool still name the whole attachment.
-    assert.equal(events[0].data.archive.attachments[0].uri, attachment);
+    assert.equal(events[0].data.archive.attachments[0].uri, `${LINK_FOLDER}/attachments/01-big.pdf`);
 
     const { read } = reader(t, { ov, config, event: events[0] });
     const second = ov.state.files.get(`${attachment}/chunks/big_2.md`);
@@ -624,8 +862,8 @@ describe('mail in OpenViking', () => {
     imap.deliver(multipartMail({ text: 'See the report.', parts: [file('report.pdf', 'application/pdf', '%PDF-1.4 revenue')] }));
     await until(() => events.length === 1);
     const [event] = events;
-    assert.ok(event.content.includes(`[attachment 01 report.pdf (application/pdf, 16 B): ${FOLDER}/attachments/01-report.pdf (OpenViking is still reading it)]`));
-    assert.deepEqual(event.content.split('\n').slice(2, 3), [`[mail stored: ${FOLDER}/body.md; all of its text is below]`]);
+    assert.ok(event.content.includes(`[attachment 01 report.pdf (application/pdf, 16 B): ${LINK_FOLDER}/attachments/01-report.pdf (OpenViking is still reading it)]`));
+    assert.deepEqual(event.content.split('\n').slice(2, 3), [`[mail stored: ${LINK_FOLDER}/body.md; all of its text is below]`]);
     assert.ok(event.content.endsWith('\n\nSee the report.'), event.content);
     assert.equal(event.data.archive.attachments[0].status, 'processing');
 

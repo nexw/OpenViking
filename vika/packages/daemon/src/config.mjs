@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Beijing Volcano Engine Technology Co., Ltd.
 // SPDX-License-Identifier: AGPL-3.0
 
+
+import { localSocketPath, supportsFileModes } from './platform/index.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -104,13 +106,15 @@ function privateRegularFileEnv(name) {
   return privateRegularFile(process.env[name], name);
 }
 
-function privateRegularFile(value, name) {
+// Windows lstat reports 0o666 regardless of ACLs, so mode bits are only
+// enforced where the platform has POSIX file modes.
+export function privateRegularFile(value, name, enforceFileMode = supportsFileModes) {
   const raw = String(value ?? '').trim();
   if (!raw || !path.isAbsolute(raw)) throw new Error(`${name} must be an absolute path`);
   const resolved = path.normalize(raw);
   const info = fs.lstatSync(resolved);
   if (!info.isFile() || info.isSymbolicLink()) throw new Error(`${name} must be a regular file`);
-  if ((info.mode & 0o077) !== 0) throw new Error(`${name} must have mode 0600`);
+  if (enforceFileMode && (info.mode & 0o077) !== 0) throw new Error(`${name} must have mode 0600`);
   if (typeof process.getuid === 'function' && info.uid !== process.getuid()) {
     throw new Error(`${name} must be owned by the daemon user`);
   }
@@ -205,13 +209,21 @@ export function getConfig() {
     // On by default; agents[].naturalWriting: false turns it off.
     naturalWriting: boolEnv('VIKA_NATURAL_WRITING', true),
     openVikingConfigPath: (process.env.OPENVIKING_CLI_CONFIG_FILE || '').trim(),
+    // Opt-in per instance (agents[].ovAutoRecall, config file only): besides
+    // the preferences it always shows, the daemon runs one OV search per line
+    // someone sends (ov-recall.mjs).
+    ovAutoRecall: boolEnv('VIKA_OV_AUTO_RECALL', false),
+    // One OpenViking tool request, bounded for the model-facing tools (the
+    // faster read/list paths get half of it).
+    openVikingToolTimeoutMs: intEnv('VIKA_OV_TOOL_TIMEOUT_MS', 20_000, { min: 1_000, max: 120_000 }),
     agentName: process.env.VIKA_AGENT_NAME || process.env.VIKA_INSTANCE_ID || 'Agent',
-    instanceId: process.env.VIKA_INSTANCE_ID || '',
+    instanceId: process.env.VIKA_INSTANCE_ID || 'default',
+    timerStorage: enumEnv('VIKA_TIMER_STORAGE', 'ov', ['ov', 'sqlite']),
     upgradeTarget: process.env.VIKA_UPGRADE_TARGET || process.env.VIKA_INSTANCE_ID || '',
     channel,
     connectors: Object.freeze(connectors),
     connectorWorkerPath: path.join(sourceDir, 'connectors', 'worker.mjs'),
-    actionSocketPath: path.join(dataDir, 'actions.sock'),
+    actionSocketPath: localSocketPath(dataDir),
     actionMcpPath: path.join(sourceDir, 'actions', 'mcp.mjs'),
     larkCliBin: cliBin(process.env.LARK_CLI_BIN || bundledLarkCli()),
     slackCliBin: cliBin(process.env.SLACK_CLI_BIN || undefined),
@@ -282,13 +294,18 @@ export function getConfig() {
       min: 1_000,
       max: 86_400_000,
     }),
-    // Opt-in per instance (agents[].explicitSilence): the stay_silent tool, the
-    // decisions ledger and the turn-end decision check. Off, the daemon offers
-    // the same tools and assembles the same policy text as without them.
+    // Per instance (agents[].explicitSilence; the manifest defaults it on except
+    // on Ark and always pins this env): the stay_silent tool, the decisions
+    // ledger and the turn-end decision check. Off, the daemon offers the same
+    // tools and assembles the same policy text as without them. Unpinned (a
+    // daemon started without a manifest) it stays off.
     explicitSilence: boolEnv('VIKA_EXPLICIT_SILENCE', false),
     // Opt-in per instance (agents[].stagedReplies): a longer task may get an
     // OnIt and interim findings before its final delivery.
     stagedReplies: boolEnv('VIKA_STAGED_REPLIES', false),
+    // agents[].larkMessageAccess: `bot` keeps every Lark read (history and
+    // search) inside the chats the bot has joined, read as the bot.
+    larkMessageAccess: enumEnv('VIKA_LARK_MESSAGE_ACCESS', 'owner', ['owner', 'bot']),
     // Opt-in per instance (agents[].meetingNotes), on one instance at most:
     // the owner's Feishu/Lark meeting notes are stored in OV.
     meetingNotes: boolEnv('VIKA_MEETING_NOTES', false) && connectors.includes('lark'),

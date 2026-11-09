@@ -1,10 +1,12 @@
 // Copyright (c) 2026 Beijing Volcano Engine Technology Co., Ltd.
 // SPDX-License-Identifier: AGPL-3.0
 
+import { spawnDetached } from './platform/index.mjs';
+
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn as nodeSpawn } from 'node:child_process';
+import { spawn as nodeSpawn } from './platform/index.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { cognitionHistoryPrefix, CognitionLimitError } from './cognition.mjs';
 import { safeError as safe } from './logger.mjs';
@@ -14,8 +16,10 @@ import { agentCliCommands } from './agent-clis.mjs';
 import { agentToolEnv, agentToolServer } from './actions/api.mjs';
 import { assembleConversationPolicy } from './conversation-policy.mjs';
 import { assertPiVersion, piCommand, PI_MCP_EXTENSION, PI_MCP_STATUS } from './pi-runtime.mjs';
+import { piIsolationArgs } from './ov-isolation.mjs';
 import { deliveryItem, receiptIds, withReceiptIds, withTurnNotice } from './runtime-input.mjs';
 import { getRuntimeDefinition } from './runtime-catalog.mjs';
+import { BoundedLineReader, lineTypeFromPrefix, stringFieldFromPrefix } from './line-reader.mjs';
 
 const MAX_LINE_BYTES = 5_000_000;
 const START_TIMEOUT_MS = 15_000;
@@ -26,9 +30,17 @@ const RPC_TIMEOUT_MS = 8_000;
 const PI_RUNTIME = getRuntimeDefinition('pi');
 export const PI_EFFORTS = PI_RUNTIME.efforts;
 
+// Pi events the daemon can lose when one is too long for MAX_LINE_BYTES. They
+// echo a tool result or a run's messages, base64 images included; the model
+// already has them inside Pi, the daemon only logs them, and a run ends on
+// agent_settled. Losing one costs a log row, not the turn.
+const SKIPPABLE_OVERSIZED_EVENTS = new Set([
+  'message_start', 'message_end', 'tool_execution_update', 'tool_execution_end', 'turn_end', 'agent_end',
+]);
+
 const PREFLIGHT_FLAGS = [
   '--mode', '--append-system-prompt', '--thinking',
-  '--session-id', '--session-dir', '--model', '--extension', '--approve',
+  '--session-id', '--session-dir', '--model', '--extension', '--approve', '--no-extensions',
 ];
 
 function delay(ms) {
@@ -80,6 +92,7 @@ export class PiAgent {
     this.store = store;
     this.logger = logger;
     this._spawn = options.spawn ?? nodeSpawn;
+    this._isolationArgs = options.isolationArgs ?? piIsolationArgs;
     this.onTurnFailed = options.onTurnFailed ?? null;
     this.onTurnSucceeded = options.onTurnSucceeded ?? null;
     this.onTurnAbandoned = options.onTurnAbandoned ?? null;
@@ -127,7 +140,16 @@ export class PiAgent {
     this.activeItems = [];
     this.activeOwner = null;
     this.queue = [];
-    this.stdoutBuffer = '';
+    this.stdoutLines = new BoundedLineReader({
+      maxLineBytes: MAX_LINE_BYTES,
+      label: 'pi stdout line',
+      onLine: (line) => {
+        try { this._handleLine(line); } catch (error) {
+          this.logger.warn('pi_line_error', { error: safe(error) });
+        }
+      },
+      onOversized: (prefix) => this._onOversizedLine(prefix),
+    });
     this.stderrBuffer = '';
     this.stopping = false;
     this.startedOk = false;
@@ -207,7 +229,9 @@ export class PiAgent {
   async _preflight() {
     const version = await this._probe(['--version']);
     assertPiVersion(version.stdout);
-    const help = await this._probe(['--help']);
+    // Pi loads every extension it discovers to list their flags, OpenViking's
+    // own included (ov-isolation.mjs): the core flags are all that is checked.
+    const help = await this._probe(['-ne', '--help']);
     for (const flag of PREFLIGHT_FLAGS) {
       if (!help.stdout.includes(flag)) {
         throw new Error(`pi preflight is missing required flag ${flag}`);
@@ -231,7 +255,7 @@ export class PiAgent {
           cwd: this.config.workspace,
           env: sanitizePiEnv(process.env, this.larkProfile(), agentToolEnv(this.config, this.authorityToken), this.config),
           shell: false,
-          detached: process.platform !== 'win32',
+          detached: spawnDetached,
           stdio: ['ignore', 'pipe', 'pipe'],
         });
       } catch (error) { reject(error); return; }
@@ -294,6 +318,8 @@ export class PiAgent {
     if (this.needsHistoryPrefix) await this.store.prepareOVContext?.(this.cognitionEpoch);
     const model = this.model;
     const effort = this.effort;
+    const env = sanitizePiEnv(process.env, this.larkProfile(), agentToolEnv(this.config, this.authorityToken), this.config);
+    const isolationArgs = await this._isolationArgs(env, this.config.workspace);
     return new Promise((resolve, reject) => {
       const promptPath = this._promptPath();
       fs.writeFileSync(promptPath, this.developerInstructionsText, { encoding: 'utf8', mode: 0o600 });
@@ -304,11 +330,11 @@ export class PiAgent {
         '--session-id', this.sessionId,
         '--session-dir', this._sessionDir(),
         '--approve',
+        ...isolationArgs,
         '--extension', PI_MCP_EXTENSION,
       ];
       if (model) args.push('--model', model);
 
-      const env = sanitizePiEnv(process.env, this.larkProfile(), agentToolEnv(this.config, this.authorityToken), this.config);
       env.PERSONAL_AGENT_MCP_CONFIG = JSON.stringify({
         ...agentToolServer(this.config, this.authorityToken),
         timeout: Math.max(10, Math.ceil(this.config.sendTimeoutMs / 1_000) + 5),
@@ -320,7 +346,7 @@ export class PiAgent {
           cwd: this.config.workspace,
           env,
           shell: false,
-          detached: process.platform !== 'win32',
+          detached: spawnDetached,
           stdio: ['pipe', 'pipe', 'pipe'],
         });
       } catch (error) {
@@ -329,7 +355,7 @@ export class PiAgent {
       }
 
       this.child = child;
-      this.stdoutBuffer = '';
+      this.stdoutLines.reset();
       this.stderrBuffer = '';
       let ready = false;
       let settled = false;
@@ -569,20 +595,39 @@ export class PiAgent {
   }
 
   _onStdout(chunk, child) {
-    try { this.stdoutBuffer = appendBounded(this.stdoutBuffer, chunk, 'stdout line'); } catch (error) {
+    try { this.stdoutLines.push(chunk); } catch (error) {
       this.turnError = error;
       terminateProcessTree(child, 'SIGKILL');
-      return;
     }
-    let index;
-    while ((index = this.stdoutBuffer.indexOf('\n')) >= 0) {
-      const line = this.stdoutBuffer.slice(0, index);
-      this.stdoutBuffer = this.stdoutBuffer.slice(index + 1);
-      if (!line.trim()) continue;
-      try { this._handleLine(line); } catch (error) {
-        this.logger.warn('pi_line_error', { error: safe(error) });
-      }
+  }
+
+  // A skipped tool_execution_end still closes its tool in the activity log;
+  // its id and name come before the result on Pi's line.
+  _onOversizedLine(prefix) {
+    const type = lineTypeFromPrefix(prefix);
+    if (!SKIPPABLE_OVERSIZED_EVENTS.has(type)) return false;
+    this.logger.warn('pi_oversized_line_skipped', { type, limitBytes: MAX_LINE_BYTES });
+    if (type === 'tool_execution_end') {
+      const toolCallId = stringFieldFromPrefix(prefix, 'toolCallId');
+      const toolName = stringFieldFromPrefix(prefix, 'toolName');
+      const startedAtMs = this.toolStarts.get(toolCallId);
+      this.toolStarts.delete(toolCallId);
+      this._recordActivity('agent.tool_completed', {
+        inboundSeq: this._activeSeqs().at(-1) ?? null,
+        status: 'COMPLETED',
+        summary: toolName || 'Pi tool completed',
+        metadata: {
+          runtime: PI_RUNTIME.id,
+          toolId: toolCallId || undefined,
+          toolName: toolName || undefined,
+          ...(startedAtMs ? { durationMs: Date.now() - startedAtMs } : {}),
+          output: `[omitted: event over ${MAX_LINE_BYTES} bytes]`,
+        },
+      });
+      this.modelWorking = true;
+      this.modelStartedAtMs = Date.now();
     }
+    return true;
   }
 
   _onStderr(chunk) {

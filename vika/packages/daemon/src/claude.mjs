@@ -1,10 +1,13 @@
 // Copyright (c) 2026 Beijing Volcano Engine Technology Co., Ltd.
 // SPDX-License-Identifier: AGPL-3.0
 
+import { spawnDetached } from './platform/index.mjs';
+import * as platform from './platform/index.mjs';
+
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn as nodeSpawn } from 'node:child_process';
+import { spawn as nodeSpawn } from './platform/index.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { cognitionHistoryPrefix, CognitionLimitError } from './cognition.mjs';
 import { safeError as safe } from './logger.mjs';
@@ -15,6 +18,8 @@ import { agentToolEnv, agentToolServer } from './actions/api.mjs';
 import { assembleConversationPolicy } from './conversation-policy.mjs';
 import { deliveryItem, receiptIds, withReceiptIds, withTurnNotice } from './runtime-input.mjs';
 import { getRuntimeDefinition, isModelUnavailableError } from './runtime-catalog.mjs';
+import { claudeIsolationSettings, isOpenViking } from './ov-isolation.mjs';
+import { BoundedLineReader, lineTypeFromPrefix, stringFieldFromPrefix } from './line-reader.mjs';
 
 const MAX_LINE_BYTES = 5_000_000;
 const START_TIMEOUT_MS = 5_000;
@@ -23,6 +28,11 @@ const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_CAP_MS = 30_000;
 
 const CLAUDE_RUNTIME = getRuntimeDefinition('claude');
+
+// stream-json `user` lines echo tool results, base64 images included. The
+// model already has them inside Claude Code and the daemon only logs them, so
+// one too long for MAX_LINE_BYTES is skipped rather than failing the turn.
+const SKIPPABLE_OVERSIZED_EVENTS = new Set(['user']);
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -50,6 +60,7 @@ export class ClaudeAgent {
     this.store = store;
     this.logger = logger;
     this._spawn = options.spawn ?? nodeSpawn;
+    this.platform = options.platform ?? platform;
     this.onTurnFailed = options.onTurnFailed ?? null;
     this.onTurnSucceeded = options.onTurnSucceeded ?? null;
     this.onTurnAbandoned = options.onTurnAbandoned ?? null;
@@ -97,7 +108,16 @@ export class ClaudeAgent {
     this.activeItems = [];
     this.activeOwner = null;
     this.queue = [];
-    this.stdoutBuffer = '';
+    this.stdoutLines = new BoundedLineReader({
+      maxLineBytes: MAX_LINE_BYTES,
+      label: 'claude stdout line',
+      onLine: (line) => {
+        try { this._handleLine(line); } catch (error) {
+          this.logger.warn('claude_line_error', { error: safe(error) });
+        }
+      },
+      onOversized: (prefix) => this._onOversizedLine(prefix),
+    });
     this.stderrBuffer = '';
     this.stopping = false;
     this.startedOk = false;
@@ -193,7 +213,7 @@ export class ClaudeAgent {
     for (const flag of [
       '--input-format', '--output-format', '--resume', '--session-id', '--mcp-config',
       '--dangerously-skip-permissions', '--disallowed-tools', '--effort',
-      '--append-system-prompt', '--no-chrome', '--model', '--print', '--permission-prompts',
+      '--append-system-prompt', '--no-chrome', '--model', '--print', '--permission-prompts', '--settings',
     ]) {
       if (!help.stdout.includes(flag)) {
         const hint = flag === '--permission-prompts' ? '; upgrade Claude Code to 2.1.259 or newer for unattended operation' : '';
@@ -216,7 +236,7 @@ export class ClaudeAgent {
           cwd: this.config.workspace,
           env: sanitizeClaudeEnv(process.env, this.config.profile, agentToolEnv(this.config, this.authorityToken), this.config),
           shell: false,
-          detached: process.platform !== 'win32',
+          detached: spawnDetached,
           stdio: ['ignore', 'pipe', 'pipe'],
         });
       } catch (error) { reject(error); return; }
@@ -271,6 +291,15 @@ export class ClaudeAgent {
     return configPath;
   }
 
+  _systemPromptArgs() {
+    if (this.platform.maxCommandLineLength === null) return ['--append-system-prompt', this.developerInstructionsText];
+    // stdin is the conversation transport. Keep policy in the system role via
+    // Claude's documented file option, using the existing directory lifecycle.
+    const file = path.join(this.mcpTempDir, 'system-prompt.md');
+    fs.writeFileSync(file, this.developerInstructionsText, { encoding: 'utf8', mode: 0o600 });
+    return ['--append-system-prompt-file', file];
+  }
+
   _cleanupMcpConfig() {
     const directory = this.mcpTempDir;
     this.mcpTempDir = null;
@@ -293,11 +322,13 @@ export class ClaudeAgent {
         '--verbose',
         '--output-format', 'stream-json',
         '--input-format', 'stream-json',
-        // No --strict-mcp-config: user-scope skill/MCP servers (OpenViking via
-        // OPENVIKING_* env) load alongside personal_agent.
+        // No --strict-mcp-config: the owner's other MCP servers load alongside
+        // personal_agent. OpenViking's plugin and servers do not: Vika owns
+        // OpenViking (ov-isolation.mjs).
         '--mcp-config', mcpConfigPath,
+        '--settings', JSON.stringify(claudeIsolationSettings({ env: process.env, workspace: this.config.workspace })),
         '--disallowed-tools', 'EnterPlanMode,ExitPlanMode',
-        '--append-system-prompt', this.developerInstructionsText,
+        ...this._systemPromptArgs(),
         '--no-chrome',
       ];
       if (effort) args.push('--effort', effort);
@@ -311,7 +342,7 @@ export class ClaudeAgent {
           cwd: this.config.workspace,
           env: sanitizeClaudeEnv(process.env, this.config.profile, agentToolEnv(this.config, this.authorityToken), this.config),
           shell: false,
-          detached: process.platform !== 'win32',
+          detached: spawnDetached,
           stdio: ['pipe', 'pipe', 'pipe'],
         });
       } catch (error) {
@@ -323,7 +354,7 @@ export class ClaudeAgent {
       this.child = child;
       this.catalogRequest = null;
       this.actualModel = '';
-      this.stdoutBuffer = '';
+      this.stdoutLines.reset();
       this.stderrBuffer = '';
       let spawned = false;
       let ready = false;
@@ -512,20 +543,38 @@ export class ClaudeAgent {
   }
 
   _onStdout(chunk, child) {
-    try { this.stdoutBuffer = appendBounded(this.stdoutBuffer, chunk, 'stdout line'); } catch (error) {
+    try { this.stdoutLines.push(chunk); } catch (error) {
       this.turnError = error;
       terminateProcessTree(child, 'SIGKILL');
-      return;
     }
-    let index;
-    while ((index = this.stdoutBuffer.indexOf('\n')) >= 0) {
-      const line = this.stdoutBuffer.slice(0, index);
-      this.stdoutBuffer = this.stdoutBuffer.slice(index + 1);
-      if (!line.trim()) continue;
-      try { this._handleLine(line); } catch (error) {
-        this.logger.warn('claude_line_error', { error: safe(error) });
-      }
+  }
+
+  // A skipped tool result still closes its tool in the activity log when its
+  // id is near the start of the line, as stream-json writes it.
+  _onOversizedLine(prefix) {
+    const type = lineTypeFromPrefix(prefix);
+    if (!SKIPPABLE_OVERSIZED_EVENTS.has(type)) return false;
+    this.logger.warn('claude_oversized_line_skipped', { type, limitBytes: MAX_LINE_BYTES });
+    const toolUseId = stringFieldFromPrefix(prefix, 'tool_use_id');
+    const started = toolUseId ? this.toolStarts.get(toolUseId) : null;
+    if (started) {
+      this.toolStarts.delete(toolUseId);
+      this._recordActivity('agent.tool_completed', {
+        inboundSeq: this._activeSeqs().at(-1) ?? null,
+        status: 'COMPLETED',
+        summary: started.name,
+        metadata: {
+          runtime: CLAUDE_RUNTIME.id,
+          toolId: toolUseId,
+          toolName: started.name,
+          durationMs: Date.now() - started.atMs,
+          output: `[omitted: event over ${MAX_LINE_BYTES} bytes]`,
+        },
+      });
     }
+    this.modelWorking = true;
+    this.modelStartedAtMs = Date.now();
+    return true;
   }
 
   _onStderr(chunk) {
@@ -586,6 +635,14 @@ export class ClaudeAgent {
 
     if (message.type === 'system' && message.subtype === 'init') {
       if (typeof message.model === 'string') this.actualModel = message.model;
+      // The launch settings keep OpenViking's plugin and servers out; say so
+      // loudly if a Claude Code release stops honoring them.
+      const loaded = [...(message.plugins ?? []), ...(message.mcp_servers ?? [])]
+        .map((item) => (typeof item === 'string' ? item : item?.name)).filter(isOpenViking);
+      if (loaded.length) {
+        this.logger.error('ov_plugin_loaded', { runtime: CLAUDE_RUNTIME.id, names: loaded });
+        this._recordActivity('agent.ov_plugin_loaded', { summary: loaded.join(', '), metadata: { runtime: CLAUDE_RUNTIME.id } });
+      }
       const sessionId = message.session_id ?? message.sessionId;
       if (typeof sessionId === 'string' && sessionId) {
         this.sessionId = sessionId;
