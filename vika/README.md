@@ -6,7 +6,7 @@ Set up your machine (local or a cloud VM) with the software, projects, and tools
 
 Vika supports runtimes such as Codex, Claude Code, DeepSeek Harness, and Pi, and connects to Feishu / Lark, WeChat, Telegram, Slack, QQ, and email. The CLI command is `vika`.
 
-[Quick start](install.md) · [Features and architecture](docs/usage-reference.md) · [Configuration example](config.example.json) · [Contributing](../CONTRIBUTING.md)
+[Quick start](install.md) · [Native Termux](docs/termux.md) · [Features and architecture](docs/usage-reference.md) · [Configuration example](config.example.json) · [Contributing](../CONTRIBUTING.md)
 
 ## Why Vika
 
@@ -33,7 +33,9 @@ This installs the latest release (currently `0.5.0-preview`). To pin a version, 
 irm https://ovrelease.tos-cn-beijing.volces.com/vika/install.ps1 | iex
 ```
 
-The package includes Node, PM2, chat CLIs, Pi, and Durable. On first installation, `vika setup` connects OV, selects a runtime and workspace, and authorizes your chat channels. You do not need to install lark-cli globally. For Codex or Claude Code, install and sign in to that CLI first. DeepSeek Harness is not bundled either: install `dsh` **0.2.x** (0.2.2-rc.1 or later) on Node 24.9+, then manage its model routes with `vika dsh model`.
+**Native Termux (Android/Bionic; source install):** published Linux artifacts require glibc and do not run in Termux. Follow [Native Termux](docs/termux.md) and run `node scripts/install-termux.mjs` from a source checkout.
+
+The published desktop packages include Node, PM2, chat CLIs, Pi, and Durable. On first installation, `vika setup` connects OV, selects a runtime and workspace, and authorizes your chat channels. You do not need to install lark-cli globally. For Codex or Claude Code, install and sign in to that CLI first. DeepSeek Harness is not bundled either: install `dsh` **0.2.x** (0.2.2-rc.1 or later) on Node 24.9+, then manage its model routes with `vika dsh model`.
 
 Once configured, send the bot a task in a direct chat:
 
@@ -63,7 +65,7 @@ The release-process guide is currently in Chinese.
 
 | Topic | Guide |
 |---|---|
-| Installation, model sign-in, first connection | [Installation](install.md) |
+| Installation, model sign-in, first connection | [Installation](install.md) · [Native Termux](docs/termux.md) |
 | Chat channels, email, attachments, and cards | [Feature reference](docs/usage-reference.md#chat-channels-and-email) |
 | Permissions, sign-in, upgrades, rollback, and development | [Configuration and operations](docs/installation-reference.md) |
 | Context archival and recovery | [OV session context](docs/ov-session-context.md) |
