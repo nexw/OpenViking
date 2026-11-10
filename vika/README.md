@@ -4,9 +4,9 @@
 
 Set up your machine (local or a cloud VM) with the software, projects, and tools you need. OpenViking SuperAgent (Vika) connects your agent to OpenViking and instant messaging: send a task in chat, let your agent work on your machine, and receive the results in the same conversation. OpenViking provides knowledge, memory, and context across sessions.
 
-Vika supports runtimes such as Codex, Claude Code, and Pi, and connects to Feishu / Lark, WeChat, Telegram, Slack, QQ, and email. The CLI command is `vika`.
+Vika supports runtimes such as Codex, Claude Code, DeepSeek Harness, and Pi, and connects to Feishu / Lark, WeChat, Telegram, Slack, QQ, and email. The CLI command is `vika`.
 
-[Quick start](install.md) · [Windows source preview](docs/windows.md) · [Native Termux](docs/termux.md) · [Features and architecture](docs/usage-reference.md) · [Configuration example](config.example.json) · [Contributing](../CONTRIBUTING.md)
+[Quick start](install.md) · [Native Termux](docs/termux.md) · [Features and architecture](docs/usage-reference.md) · [Configuration example](config.example.json) · [Contributing](../CONTRIBUTING.md)
 
 ## Why Vika
 
@@ -17,15 +17,25 @@ Vika supports runtimes such as Codex, Claude Code, and Pi, and connects to Feish
 
 ## Quick start
 
-You need macOS or Linux, a configured model runtime, and **an OpenViking service (required; local or remote)**. On Windows, use WSL2 with this published release, or try the experimental [Windows x64 preview package](docs/windows-preview.md) (a GitHub Actions artifact; GitHub sign-in required, kept for 14 days).
+You need a configured model runtime and **an OpenViking service (required; local or remote)**. Choose the command for your system; both installers open the same `vika setup` on first interactive installation.
+
+**macOS / Linux / WSL2 (x64 or arm64):**
 
 ```bash
-curl -fsSL https://ovrelease.tos-cn-beijing.volces.com/vika/releases/0.4.0-24e73d5a3f7a/install.sh | sh -s -- --version 0.4.0-24e73d5a3f7a
+curl -fsSL https://ovrelease.tos-cn-beijing.volces.com/vika/install.sh | sh
 ```
 
-This command installs a pinned release. The unversioned installer and `latest` endpoint are not currently available.
+This installs the latest release (currently `0.5.0-preview`). To pin a version, use `curl -fsSL https://ovrelease.tos-cn-beijing.volces.com/vika/releases/<version>/install.sh | sh -s -- --version <version>`.
 
-The package includes Node, PM2, chat CLIs, Pi, and Durable. On first installation, `vika setup` connects OV, selects a runtime and workspace, and authorizes your chat channels. You do not need to install lark-cli globally. For Codex or Claude Code, install and sign in to that CLI first.
+**Windows 10/11 (x64, preview), in PowerShell 5.1 or 7:**
+
+```powershell
+irm https://ovrelease.tos-cn-beijing.volces.com/vika/install.ps1 | iex
+```
+
+**Native Termux (Android/Bionic; source install):** published Linux artifacts require glibc and do not run in Termux. Follow [Native Termux](docs/termux.md) and run `node scripts/install-termux.mjs` from a source checkout.
+
+The published desktop packages include Node, PM2, chat CLIs, Pi, and Durable. On first installation, `vika setup` connects OV, selects a runtime and workspace, and authorizes your chat channels. You do not need to install lark-cli globally. For Codex or Claude Code, install and sign in to that CLI first. DeepSeek Harness is not bundled either: install `dsh` **0.2.x** (0.2.2-rc.1 or later) on Node 24.9+, then manage its model routes with `vika dsh model`.
 
 Once configured, send the bot a task in a direct chat:
 
@@ -41,8 +51,9 @@ Send `/help` in a direct chat for commands, `/status` for status, `/model` and `
 vika setup           # Add or edit an instance
 vika status
 vika logs primary
-vika upgrade primary
 ```
+
+For upgrades, see the [platform-specific instructions](docs/installation-reference.md#upgrade-and-rollback).
 
 The console at `http://127.0.0.1:3737` shows message processing and tool activity.
 
@@ -54,12 +65,13 @@ The release-process guide is currently in Chinese.
 
 | Topic | Guide |
 |---|---|
-| Installation, model sign-in, first connection | [Installation](install.md) |
+| Installation, model sign-in, first connection | [Installation](install.md) · [Native Termux](docs/termux.md) |
 | Chat channels, email, attachments, and cards | [Feature reference](docs/usage-reference.md#chat-channels-and-email) |
 | Permissions, sign-in, upgrades, rollback, and development | [Configuration and operations](docs/installation-reference.md) |
 | Context archival and recovery | [OV session context](docs/ov-session-context.md) |
 | Adding message sources | [Connector protocol](docs/connector-protocol.md) |
 | Durable models and recovery | [Durable runtime](docs/pi-durable-runtime.md) |
+| DSH model routes, credentials, and limits | [DSH runtime](docs/dsh-runtime.md) |
 | Reliability and acceptance checks | [Reliability limits](docs/usage-reference.md#reliability-limits) · [Feishu acceptance](docs/usage-reference.md#feishu-acceptance-checks) |
 
 Features in the source tree may not yet be published. Check your installed release.

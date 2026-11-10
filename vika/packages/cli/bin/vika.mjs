@@ -34,6 +34,10 @@ const commands = () => {
       ['autostart', '<enable|disable>', t('开机自动启动（不需要 sudo）', 'Start at login (no sudo needed)')],
       ['pi', t('[参数...]', '[arguments...]'), t('打开内置的 Pi（例如用 /login 登录模型）', 'Open the built-in Pi (e.g. /login to a model)')],
     ]],
+    [t('模型', 'Models'), [
+      ['dsh model', t('[list|remove|import|repair|key]', '[list|remove|import|repair|key]'),
+        t('查看和修改实例的 DSH 模型与凭据', 'Show and change an instance’s DSH models and credentials')],
+    ]],
     [t('选项', 'Options'), [
       ['--lang', '<zh|en>', t('切换界面语言，之后的命令都用它', 'Switch the interface language, for later commands too')],
     ]],
@@ -106,8 +110,15 @@ async function main([command, ...args], lang) {
     }
     case 'logs': {
       if (args.length > 1) break;
-      const [{ logsCommand }, { chooseInstance, loadInstances }, { Prompter }] = await Promise.all([
-        import('../src/control.mjs'), import('../src/instances.mjs'), import('../src/prompt.mjs')]);
+      // Sequential on purpose: `control.mjs` imports the platform facade and
+      // `instances.mjs` reaches the same facade through the CommonJS
+      // `deployment-config.cjs`, so loading both at once makes the CJS `require`
+      // run while the ES module is still evaluating (ERR_REQUIRE_ESM_RACE_CONDITION,
+      // Node's own message names the fix). Loading one at a time costs nothing
+      // here: these are three small modules and the command tails a log file.
+      const { logsCommand } = await import('../src/control.mjs');
+      const { chooseInstance, loadInstances } = await import('../src/instances.mjs');
+      const { Prompter } = await import('../src/prompt.mjs');
       const prompter = new Prompter();
       const agent = await chooseInstance({ deployment: loadInstances(), requested: args[0], prompter, question: t('看哪个实例的日志', 'Whose logs') })
         .finally(() => prompter.close());
@@ -140,6 +151,21 @@ async function main([command, ...args], lang) {
       const { managedPiBin } = await import('../../daemon/src/pi-runtime.mjs');
       const child = spawn(process.execPath, [managedPiBin(), ...args], { stdio: 'inherit' });
       return new Promise((resolve) => child.once('exit', (code) => resolve(code ?? 0)));
+    }
+    case 'dsh': {
+      // `vika dsh model ...`: the only dsh subcommand today. A future one is
+      // added here, not as another top-level name.
+      if (args[0] !== 'model') break;
+      // The model command resolves its own instance (import --dry-run works
+      // without one), so the manifest is not required before it loads.
+      const [{ dshModelCommand }, { Prompter }] = await Promise.all([
+        import('../src/dsh-model.mjs'), import('../src/prompt.mjs')]);
+      const prompter = new Prompter();
+      try {
+        return await dshModelCommand(args.slice(1), { prompter });
+      } finally {
+        prompter.close();
+      }
     }
     case '--version':
     case 'version': {

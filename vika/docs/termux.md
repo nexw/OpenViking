@@ -4,6 +4,7 @@ This source installation uses Termux's Node and a locally built lark-cli. It
 does not download glibc Node binaries, impersonate Linux, or require PRoot.
 Pi and Durable are installed locally at the pinned **1.5.0** versions; global
 installations are left alone. Both runtime checks must pass before activation.
+DeepSeek Harness is optional and requires Node 24.9 or later.
 
 ## Install
 
@@ -11,7 +12,7 @@ Use Termux private storage, not `/sdcard` (execution, symlinks and file modes
 are needed). Install Node >=22.19.0 with `node:sqlite`, npm, bash, git and tar
 from Termux. Build/install a native lark-cli separately; its executable must
 support the same CLI/API used by Vika. This branch pins the desktop CLI to
-1.0.94; a different native build needs connector testing.
+1.0.99; a different native build needs connector testing.
 
 From this checkout's `vika/` directory:
 

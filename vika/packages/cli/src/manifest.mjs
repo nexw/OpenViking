@@ -6,6 +6,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import * as platform from '../../daemon/src/platform/index.mjs';
 import { list, t } from './i18n.mjs';
 import { writeManifest as saveManifest } from '../../daemon/src/deployment-manifest.mjs';
 export { validateManifest } from '../../daemon/src/deployment-manifest.mjs';
@@ -24,11 +25,26 @@ const {
 
 export { ROLE_PRESETS };
 
+/**
+ * The environment runtime detection should look at: the manifest's own `env`
+ * first, overridden by the caller's. A binary path pinned there (`CODEX_BIN`,
+ * `DSH_BIN`, ...) is what the daemon will run, so a probe that only read
+ * `process.env` would call a machine without the CLI on PATH "not installed"
+ * while the daemon starts it every day. The operator's environment wins, which
+ * is the same precedence the daemon applies.
+ * @param {object} env - the caller's environment.
+ * @param {object|null} manifest - the loaded manifest, if any.
+ * @returns {object} the environment to probe with.
+ */
+export function detectionEnv(env, manifest) {
+  return { ...(manifest?.env ?? {}), ...env };
+}
+
 export const WEB_PORT = 3737;
 const FIRST_INSTANCE_PORT = 3738;
 
 export function vikaHome(env = process.env) {
-  return path.join(env.HOME || os.homedir(), '.vika');
+  return path.join(platform.homeDir(env) || os.homedir(), '.vika');
 }
 
 // setup persists the default so users can inspect/change it. A global or
@@ -41,10 +57,16 @@ export function withDefaultTempDir(agent, env = {}) {
 }
 
 // How to call the vika command from here: by name once ~/.vika/bin is on
-// PATH, by its full path in the shell the installer ran from.
-export function vikaCommand(env = process.env) {
+// PATH, by its full path in the shell the installer ran from. Where the platform
+// runs no shell scripts, that path is the batch launcher, not a ~ prefix.
+export function vikaCommand(env = process.env, implementation = platform) {
   const bin = path.join(vikaHome(env), 'bin');
-  return String(env.PATH || '').split(path.delimiter).includes(bin) ? 'vika' : '~/.vika/bin/vika';
+  const entries = String(env.PATH || '').split(implementation.pathDelimiter);
+  const same = (entry) => implementation.environmentCaseSensitive
+    ? entry === bin
+    : entry.toLowerCase() === bin.toLowerCase();
+  if (entries.some(same)) return 'vika';
+  return implementation.supportsShellScripts ? '~/.vika/bin/vika' : path.join(bin, 'vika.cmd');
 }
 
 export function manifestPath(env = process.env) {

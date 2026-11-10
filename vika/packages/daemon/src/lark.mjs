@@ -340,7 +340,7 @@ export class LarkClient {
       const cover = await videoCover(this.registry, content.path, work, this.logger);
       try {
         return await this.im([...target, '--video', `./${path.basename(content.path)}`,
-          '--video-cover', `./${path.relative(dir, cover)}`, ...suffix], 'send video', { cwd: dir });
+          '--video-cover', `./${path.relative(dir, cover).split(path.sep).join('/')}`, ...suffix], 'send video', { cwd: dir });
       } catch (error) {
         throw new Error(`${error.message}; if it keeps failing, upload the video to Drive and send the link instead`);
       }
@@ -356,7 +356,8 @@ export class LarkClient {
     // Check every frozen resource before the first external side effect.
     const root = path.join(this.config.tempDir, 'outbox');
     for (const asset of assets) {
-      const { bytes } = readWorkspaceFile(path.relative(root, asset.path), root, MAX_CARD_IMAGE_BYTES);
+      const relative = path.relative(root, asset.path).split(path.sep).join('/');
+      const { bytes } = readWorkspaceFile(relative, root, MAX_CARD_IMAGE_BYTES);
       cardImageFormat(bytes);
       if (createHash('sha256').update(bytes).digest('hex') !== asset.digest) throw new Error('card image snapshot changed');
     }
@@ -495,11 +496,13 @@ export class LarkClient {
     return { chats: matched.slice(0, limit), has_more: hasMore || matched.length > limit };
   }
 
-  async listChatMessages({ chat_id: chatId, limit = 20, as = 'bot' }) {
+  async listChatMessages({ chat_id: chatId, limit = 20, as = 'bot', cursor }) {
     const data = await this.im([
       '+chat-messages-list', '--as', as, '--chat-id', chatId, '--sort', 'desc', '--page-size', String(limit), '--format', 'json',
+      ...(cursor ? ['--page-token', cursor] : []),
     ], 'list chat messages');
-    return { messages: messageList(data), has_more: Boolean(data.has_more) };
+    return { messages: messageList(data), has_more: Boolean(data.has_more),
+      next_cursor: data.has_more && typeof data.page_token === 'string' ? data.page_token : '' };
   }
 
   // As the owner by default; as the bot, the search covers only the chats it
@@ -512,11 +515,13 @@ export class LarkClient {
     return { messages: messageList(data).slice(0, limit), has_more: Boolean(data.has_more) };
   }
 
-  async listThreadMessages({ thread_id: threadId, limit = 50, as = 'bot' }) {
+  async listThreadMessages({ thread_id: threadId, limit = 50, as = 'bot', cursor }) {
     const data = await this.im([
       '+threads-messages-list', '--as', as, '--thread', threadId, '--order', 'asc', '--page-size', String(limit), '--format', 'json',
+      ...(cursor ? ['--page-token', cursor] : []),
     ], 'list thread messages');
-    return { messages: messageList(data), has_more: Boolean(data.has_more) };
+    return { messages: messageList(data), has_more: Boolean(data.has_more),
+      next_cursor: data.has_more && typeof data.page_token === 'string' ? data.page_token : '' };
   }
 
   // Downloads one message resource into the private media directory. The

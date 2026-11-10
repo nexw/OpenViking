@@ -6,15 +6,35 @@ This reference covers running the daemon. For the product overview, read the [RE
 
 ## One-command installation
 
+Both platforms use the same [installation and setup guide](../install.md).
+
+**macOS / Linux / WSL2:**
+
 ```bash
-curl -fsSL https://ovrelease.tos-cn-beijing.volces.com/vika/releases/0.4.0-24e73d5a3f7a/install.sh | sh -s -- --version 0.4.0-24e73d5a3f7a
+curl -fsSL https://ovrelease.tos-cn-beijing.volces.com/vika/install.sh | sh
 ```
 
-This command pins a published preview. The unversioned installer and `vika/latest` currently return 404; do not omit `--version` until the release endpoints are published.
+This installs the version in `vika/latest` (currently `0.5.0-preview`; until a stable release ships, `latest` follows previews). To pin a version, use `curl -fsSL https://ovrelease.tos-cn-beijing.volces.com/vika/releases/<version>/install.sh | sh -s -- --version <version>`.
 
-The installer detects Linux or macOS and x64 or arm64 (use WSL2 on Windows), downloads the matching archive, verifies SHA-256, extracts it to `~/.vika/releases/<version>`, adds `~/.vika/bin` to your shell PATH, and enters `vika setup`. Only sh, curl, tar, and sha256sum (or shasum) are required. The package supplies pinned Node, PM2, lark-cli, and Pi without modifying existing Node, npm, PM2, or git installations. Before switching, it runs the new bundled Node; incompatible system libraries or CPU architecture leave the previous installation intact. musl systems such as Alpine are unsupported.
+The installer detects Linux or macOS and x64 or arm64 (including WSL2), downloads the matching archive, verifies SHA-256, extracts it to `~/.vika/releases/<version>`, adds `~/.vika/bin` to your shell PATH, and enters `vika setup`. Only sh, curl, tar, and sha256sum (or shasum) are required. The package supplies pinned Node, PM2, lark-cli, and Pi without modifying existing Node, npm, PM2, or git installations. Before switching, it runs the new bundled Node; incompatible system libraries or CPU architecture leave the previous installation intact. musl systems such as Alpine are unsupported.
 
-Both the installer and CLI support English and Chinese. `vika --lang en` (or `zh`) persists the choice in `~/.vika/language`. To install in English, append `--lang en` after the version argument above. `VIKA_LANG` overrides the language for one invocation only. The default is Chinese when no preference is set.
+**Windows 10/11 x64 (preview), PowerShell 5.1 or 7:**
+
+```powershell
+irm https://ovrelease.tos-cn-beijing.volces.com/vika/install.ps1 | iex
+```
+
+The Windows installer downloads the latest Windows preview, verifies SHA-256, installs bundled Node, PM2 and chat/runtime dependencies, updates PATH, and opens the same `vika setup` on first interactive installation. No separate community wizard is needed. Vika uses `$env:HOME` when set, otherwise `$env:USERPROFILE`. Pi requires Git Bash; Durable uses native PowerShell. Slack requires a separately installed `SLACK_CLI_BIN`.
+
+To pin a Windows preview version or skip setup:
+
+```powershell
+& ([scriptblock]::Create((irm https://ovrelease.tos-cn-beijing.volces.com/vika/install.ps1))) -Version '<version>' -NoSetup -Lang en
+```
+
+The one-line command also accepts `VIKA_VERSION` and `VIKA_DOWNLOAD_BASE`; the latter is the HTTPS Vika root, before `/windows-preview`. For offline artifacts and publishing details, see [Windows package maintenance](windows-preview.md).
+
+Both the installer and CLI support English and Chinese. `vika --lang en` (or `zh`) persists the choice in `~/.vika/language`. To install in English, use `--lang en` on macOS / Linux or `-Lang en` on Windows. `VIKA_LANG` overrides the language for one invocation only. The default is Chinese when no preference is set.
 
 Interactive download progress uses a sailing-boat animation, followed by a checkmark per completed step. Redirected output and `NO_COLOR` use plain text. If `~/.vika/config.json` does not exist, rerunning the installer returns to setup; with existing instances, it installs the release and asks you to run `vika restart`.
 
@@ -22,16 +42,17 @@ Interactive download progress uses a sailing-boat animation, followed by a check
 
 - Install and authenticate Codex, Claude Code, or TraeX, or use bundled Pi / Durable. Both bundled runtimes use `~/.pi/agent`; run `vika pi`, then `/login`, if needed.
 - OpenCode is also supported: install **1.x, 1.15.7+**, and run `opencode auth login`. Vika uses ACP. OpenCode 2.x has an incompatible server contract and is unsupported by this release.
+- DeepSeek Harness (DSH) is also supported: install `dsh` **0.2.x**, version **0.2.2-rc.1** or later, on Node **24.9+**. It is not bundled. `dsh` is found on PATH or named by `DSH_BIN`; model routes and credentials live in the instance's own DSH settings document, not in `config.json`, and are managed with `vika dsh model`. `VIKA_DSH_EFFORT` sets the effort a new instance starts with and is read from the process environment only. See [DSH runtime](dsh-runtime.md).
 - **OpenViking is required** for cross-session context. Setup lists detected connections, their sources, and check results, and always offers manual address/credential entry, a configuration-file path, redetection, and exit. Local or remote URLs, custom ports, hidden API key input, and optional Account / User / Agent fields are supported. Validation failures stay in the configuration screen; IM setup starts only after validation succeeds. First interactive installation enters this wizard directly.
 - Feishu requires a phone-registered or enterprise account. Phone registration creates a free enterprise with you as administrator. **Feishu accounts signed in through Doubao are unsupported:** they can create and publish apps, but the platform refuses `tenant_access_token` with `code=21001`. Setup explains the failure and returns to the previous step; use another account or connect another channel first.
 
 Detection checks the edited instance's `ovConfig`, `OPENVIKING_CLI_CONFIG_FILE`, `~/.vika/ov-connection.json`, `~/.openviking/ovcli.conf`, and `http://127.0.0.1:1933`. It does not scan other ports. Imported files remain unchanged. When saving the instance, manually entered or imported connections are saved under Vika with mode 0600 for future instances; already discoverable configuration files are not copied.
 
-The installer itself never prompts. Except for first interactive installation followed immediately by setup, it validates OV before switching releases. Existing instances use their own `ovConfig`. First installation with `--no-setup` or without a terminal tries the environment-specified file, saved Vika connection, OV CLI configuration, then the local default address. With no configuration, only dev-mode OV at the default local port is accepted. Failed validation prevents the switch. At daemon startup, rejected configuration or credentials cause exit; temporary unavailability records an activity entry and starts without history, with synchronization retried after recovery.
+The macOS / Linux installer itself never prompts. Except for first interactive installation followed immediately by setup, it validates OV before switching releases. Existing instances use their own `ovConfig`. First installation with `--no-setup` or without a terminal tries the environment-specified file, saved Vika connection, OV CLI configuration, then the local default address. With no configuration, only dev-mode OV at the default local port is accepted. Failed validation prevents the switch. At daemon startup, rejected configuration or credentials cause exit; temporary unavailability records an activity entry and starts without history, with synchronization retried after recovery.
 
 Editing an instance's OV connection preserves memory identity and recall settings in a new configuration copy. Saving updates the manifest; discarding removes the copy.
 
-Codex, TraeX, Claude, Pi, and OpenCode need their respective model sign-in. Durable needs no separate login and can use the models available to Pi. See [config.example.json](../config.example.json) for all fields.
+Codex, TraeX, Claude, Pi, and OpenCode need their respective model sign-in. Durable needs no separate login and can use the models available to Pi. DSH needs no sign-in step in Vika: setup checks `dsh --version` plus a keyless protocol probe instead, and its model routes and credentials belong to the instance's own DSH settings document, which `vika dsh model` reads and writes. Only the built-in `deepseek-official` route needs `DEEPSEEK_API_KEY`. See [config.example.json](../config.example.json) for all fields.
 
 OpenCode setup checks `--version` and an ACP `initialize` handshake without creating a session or calling a model. It reuses OpenCode's model and authentication configuration. Override the model with `VIKA_OPENCODE_MODEL` or `/model provider/model`, and the executable with `OPENCODE_BIN`. The daemon injects session policy and the `personal_agent` MCP server through a temporary, daemon-owned `OPENCODE_CONFIG`; it does not edit `~/.config/opencode/opencode.json`. OpenCode serializes prompts within a session, so input arriving during a turn waits for the next turn.
 
@@ -41,7 +62,7 @@ For startup errors, run `vika logs <instance>`. Failed app-server handshakes inc
 
 Claude Code requires 2.1.259 or later and `--permission-prompts none`, checked during preflight. Daemon sessions are unattended: Pi extension dialogs and Codex/TraeX approval or input requests are explicitly cancelled or denied. Claude uses its official unattended settings and rejects unexpected control requests. To ask a person, the model should send a message or supported choice card, end its turn, and await a later answer. User extensions, providers, and other session configuration remain enabled.
 
-Pi 1.4.0 reads RPC responses only after extension startup finishes. An extension asking for input during `session_start` therefore causes immediate startup refusal with instructions to disable that interaction. Runtime dialogs receive a normal cancellation.
+Managed Pi 1.5.0 reads RPC responses only after extension startup finishes. An extension asking for input during `session_start` therefore causes immediate startup refusal with instructions to disable that interaction. Runtime dialogs receive a normal cancellation.
 
 Pi's exact version is pinned in `packages/daemon/package.json` and the lockfile and shipped in the release. `vika pi` opens that copy for `/login` and reuses existing Pi model credentials without upgrading global `pi`. An empty `PI_BIN` selects the bundled version; an explicit executable must match the version validated by this release or startup provides repair instructions.
 
@@ -58,11 +79,13 @@ QR-based app creation or selection in `vika setup` performs the following automa
 3. Add the bot to trusted chats and restrict app visibility. Receiving unmentioned group messages requires `im:message.group_msg`; messages from other bots also require `im:message.group_msg.include_bot:read`.
 4. Configure the bot profile with lark-cli. Add user OAuth only when reading personal resources as the user.
 
-Uploads require `im:resource`, sends require `im:message:send_as_bot`, card reading requires `im:message:readonly`, and answered-card updates require `im:message:update`. These scopes are in the permission list. Use lark-cli with `card.action.trigger` support; this implementation was validated against 1.0.94 commands and event schemas. A working CLI does not prove callbacks are enabled in the developer console. No public callback URL is needed: the CLI ACKs promptly and the model processes the answer asynchronously.
+Uploads require `im:resource`, sends require `im:message:send_as_bot`, card reading requires `im:message:readonly`, and answered-card updates require `im:message:update`. These scopes are in the permission list. Use lark-cli with `card.action.trigger` support; this implementation was validated against 1.0.99 commands and event schemas. A working CLI does not prove callbacks are enabled in the developer console. No public callback URL is needed: the CLI ACKs promptly and the model processes the answer asynchronously.
 
 `permission.json` lists the full feature set, not minimum privileges. Restrict scopes and visibility for production use.
 
 ## Running from source
+
+For Windows source development, see [Windows source development and validation](windows.md).
 
 Source development requires Node.js 22.19.0 or later.
 
@@ -100,7 +123,7 @@ After restart, reread a previously failed image message and send and reply with 
 
 ### WeChat setup
 
-For a separate WeChat instance, set `"channel": "weixin"`, `"connectors": ["weixin"]`, and a supported model such as Codex, TraeX, Claude, or Pi, with separate `port`, `dataDir`, `workspace`, and `ovConfig`. To share a session and OV space with Feishu, use `"channel": "lark"` and `"connectors": ["lark", "weixin"]`. WeChat-only instances must omit `profile`; providing it is rejected. See the [WeChat example](usage-reference.md#wechat-direct-messages).
+For a separate WeChat instance, set `"channel": "weixin"`, `"connectors": ["weixin"]`, and a supported model such as Codex, TraeX, Claude, Pi, or DSH, with separate `port`, `dataDir`, `workspace`, and `ovConfig`. To share a session and OV space with Feishu, use `"channel": "lark"` and `"connectors": ["lark", "weixin"]`. WeChat-only instances must omit `profile`; providing it is rejected. See the [WeChat example](usage-reference.md#wechat-direct-messages).
 
 ```bash
 vika login weixin weixin
@@ -171,6 +194,10 @@ vika pi                                        # Open bundled Pi, e.g. /login
 
 ## Upgrade and rollback
 
+On Windows, `vika upgrade` and the automatic updater are not supported yet. Stop Vika with `vika stop`, rerun the PowerShell installer from [One-command installation](#one-command-installation), then run `vika restart`. The installer retains the previous release for [manual rollback](windows-preview.md#configure-and-test).
+
+On macOS / Linux:
+
 ```bash
 vika upgrade <instance-id>
 vika upgrade all        # Also rolls shared Web and removes instances deleted from the manifest
@@ -195,11 +222,11 @@ Vika uses its bundled, pinned PM2 with state under `~/.vika/pm2`, independent of
 ## Autostart
 
 ```bash
-vika autostart enable    # Linux user systemd service; macOS LaunchAgent; no sudo
+vika autostart enable    # Linux user unit; macOS LaunchAgent; Windows Startup folder
 vika autostart disable
 ```
 
-Autostart executes `vika start` and captures the enabling shell's PATH so it can find codex and claude. Linux servers also need `loginctl enable-linger` to continue after logout.
+Autostart executes `vika start` and captures the enabling shell's PATH so it can find codex and claude. Linux servers also need `loginctl enable-linger` to continue after logout. On Windows it is a `.vbs` in the current user's Startup folder: no service, no administrator, hidden at logon, logging to `~/.vika/logs/autostart.log`, and listed in Task Manager's Startup tab.
 
 ## Publishing releases
 
@@ -219,4 +246,4 @@ Add entries to `agents` in `config.json`, each with separate ID, port, dataDir, 
 
 Vika owns OpenViking memory, the same for every runtime. The daemon syncs the conversation into the instance's own OV user, naming each line's speaker in `from=` and attaching no peer; extraction keeps profile, entities and events, each event once. Preferences are not extracted: when the agent calls `openviking_remember`, the Core writes the preference into the directory of the person who sent that message, `memories/preferences/owner/` for the owner and `memories/preferences/<name>~<id>/` for anyone else (the id comes from the channel identity, so namesakes stay apart). Before forwarding direct chats, mentioned group messages, document comments, and non-chat events such as mail, the daemon attaches the owner's preferences (the owner's standing rules) and the sender's; set `agents[].ovAutoRecall` to `true` in `config.json` (default `false`, not in setup) to also run one semantic search per such line. OV outages do not stop messaging; new sessions can skip history temporarily while synchronization retries.
 
-Runtimes started by Vika do not load their own OpenViking plugins: Codex and TraeX get launch overrides that disable the OV plugin, any MCP server running OV, and their own memory feature; Claude Code gets one `--settings` layer that disables the plugin and denies those servers; Pi turns extension discovery off and loads its built-in extensions and your other extensions by path; OpenCode reads a Vika-prepared config directory without the OV plugin and servers. Should a plugin still load, the instance environment keeps it from writing or recalling, with its state in `<dataDir>/openviking/`. All of this applies only to processes Vika starts; Codex, Claude Code, Pi, and OpenCode you run yourself keep their behavior.
+Runtimes started by Vika do not load their own OpenViking plugins: Codex and TraeX get launch overrides that disable the OV plugin, any MCP server running OV, and their own memory feature; Claude Code gets one `--settings` layer that disables the plugin and denies those servers; Pi turns extension discovery off and loads its built-in extensions and your other extensions by path; OpenCode reads a Vika-prepared config directory without the OV plugin and servers; DSH gets a private `DSH_HOME` under `<dataDir>/dsh/home` and a Vika-generated `--patch` overlay, so it never reads your `~/.dsh` plugins, skills, or credentials. Should a plugin still load, the instance environment keeps it from writing or recalling, with its state in `<dataDir>/openviking/`. All of this applies only to processes Vika starts; Codex, Claude Code, Pi, DSH, and OpenCode you run yourself keep their behavior.
