@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { t } from './i18n.mjs';
+import { serviceDirectory, termuxAutostart } from './termux-autostart.mjs';
 
 // `vika autostart enable|disable`: start Vika at login/boot without sudo.
 // Linux: a systemd user unit; macOS: a LaunchAgent. Both run `vika start`,
@@ -69,7 +70,11 @@ function targets(homeDir, platform) {
     : { file: path.join(homeDir, '.config', 'systemd', 'user', 'vika.service') };
 }
 
-export function autostartEnabled({ homeDir = os.homedir(), platform = defaultPlatform } = {}) {
+export function autostartEnabled({ homeDir = os.homedir(), platform = defaultPlatform, env = process.env } = {}) {
+  if (platform.loginService === 'runit') {
+    const directory = serviceDirectory(env);
+    return fs.existsSync(path.join(directory, 'run')) && !fs.existsSync(path.join(directory, 'down'));
+  }
   return capabilitiesFor(platform).autostart && fs.existsSync(targets(homeDir, platform).file);
 }
 
@@ -89,6 +94,7 @@ export async function autostartCommand([action, ...extra], {
     output.write('Autostart is not supported in the Windows preview\n');
     return 1;
   }
+  if (platform.loginService === 'runit') return termuxAutostart(action, { homeDir, env, execFileImpl, output });
   const { file } = targets(homeDir, platform);
   if (action === 'disable') {
     if (platform.loginService === 'launchd') await execFileImpl('launchctl', ['bootout', `gui/${uid}`, file]).catch(() => {});

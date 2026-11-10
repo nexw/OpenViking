@@ -46,7 +46,7 @@ function requestUpgrade(socketPath, target) {
 
 export async function upgradeCommand(args, { stdout = process.stdout, stderr = process.stderr, env = process.env } = {}) {
   if (!capabilities.updater) {
-    stderr.write('Windows source installations do not support automatic release upgrades. Stop Vika and install a new checkout manually.\n');
+    stderr.write('This source installation does not support automatic release upgrades. Stop Vika and install a new checkout manually.\n');
     return 1;
   }
   const [target, ...extra] = args;
