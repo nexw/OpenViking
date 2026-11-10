@@ -4,6 +4,8 @@ Install Vika and verify that it can receive and answer messages. See the [README
 
 ## Prerequisites
 
+**Android / native Termux:** use the separate [从零安装指南](docs/termux-android-guide.zh-CN.md). The desktop installers below bundle Linux/macOS/Windows binaries and are not the Termux installation path.
+
 - **System:** macOS / Linux / WSL2 (x64 or arm64), or Windows 10/11 (x64, preview). macOS / Linux needs sh, curl, tar, and sha256sum (or shasum); musl / Alpine is unsupported. Native Windows needs PowerShell 5.1 or 7 and a normal user account, without administrator rights. Node, npm, PM2, and lark-cli are bundled.
 - **Windows runtimes:** Durable uses native PowerShell; Pi also requires Git Bash. Slack needs a separately installed CLI configured with `SLACK_CLI_BIN`.
 - **OpenViking:** a reachable OV service is required, either local or remote. Have its address and required credentials ready, or import an existing configuration during setup. There is no skip option.

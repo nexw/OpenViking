@@ -1,5 +1,7 @@
 # Native Termux (Android/Bionic)
 
+Starting with a new Android device? Follow the [中文完整安装指南](termux-android-guide.zh-CN.md), from installing the Termux app to model login, OpenViking/Feishu setup and optional boot startup.
+
 This source installation uses Termux's Node and a locally built lark-cli. It
 does not download glibc Node binaries, impersonate Linux, or require PRoot.
 Pi and Durable are installed locally at the pinned **1.5.0** versions; global
