@@ -74,6 +74,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+if [ -n "${TERMUX_VERSION:-}" ] || { [ -n "${PREFIX:-}" ] && [ -x "${PREFIX:-}/bin/termux-info" ]; }; then
+  die 'On Termux use node scripts/install-termux.mjs from a source checkout; Linux releases require glibc.'
+fi
 case "$(uname -s)" in
   Linux) os=linux ;;
   Darwin) os=darwin ;;

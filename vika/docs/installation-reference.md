@@ -62,7 +62,7 @@ For startup errors, run `vika logs <instance>`. Failed app-server handshakes inc
 
 Claude Code requires 2.1.259 or later and `--permission-prompts none`, checked during preflight. Daemon sessions are unattended: Pi extension dialogs and Codex/TraeX approval or input requests are explicitly cancelled or denied. Claude uses its official unattended settings and rejects unexpected control requests. To ask a person, the model should send a message or supported choice card, end its turn, and await a later answer. User extensions, providers, and other session configuration remain enabled.
 
-Pi 1.4.0 reads RPC responses only after extension startup finishes. An extension asking for input during `session_start` therefore causes immediate startup refusal with instructions to disable that interaction. Runtime dialogs receive a normal cancellation.
+Managed Pi 1.5.0 reads RPC responses only after extension startup finishes. An extension asking for input during `session_start` therefore causes immediate startup refusal with instructions to disable that interaction. Runtime dialogs receive a normal cancellation.
 
 Pi's exact version is pinned in `packages/daemon/package.json` and the lockfile and shipped in the release. `vika pi` opens that copy for `/login` and reuses existing Pi model credentials without upgrading global `pi`. An empty `PI_BIN` selects the bundled version; an explicit executable must match the version validated by this release or startup provides repair instructions.
 
@@ -79,7 +79,7 @@ QR-based app creation or selection in `vika setup` performs the following automa
 3. Add the bot to trusted chats and restrict app visibility. Receiving unmentioned group messages requires `im:message.group_msg`; messages from other bots also require `im:message.group_msg.include_bot:read`.
 4. Configure the bot profile with lark-cli. Add user OAuth only when reading personal resources as the user.
 
-Uploads require `im:resource`, sends require `im:message:send_as_bot`, card reading requires `im:message:readonly`, and answered-card updates require `im:message:update`. These scopes are in the permission list. Use lark-cli with `card.action.trigger` support; this implementation was validated against 1.0.94 commands and event schemas. A working CLI does not prove callbacks are enabled in the developer console. No public callback URL is needed: the CLI ACKs promptly and the model processes the answer asynchronously.
+Uploads require `im:resource`, sends require `im:message:send_as_bot`, card reading requires `im:message:readonly`, and answered-card updates require `im:message:update`. These scopes are in the permission list. Use lark-cli with `card.action.trigger` support; this implementation was validated against 1.0.99 commands and event schemas. A working CLI does not prove callbacks are enabled in the developer console. No public callback URL is needed: the CLI ACKs promptly and the model processes the answer asynchronously.
 
 `permission.json` lists the full feature set, not minimum privileges. Restrict scopes and visibility for production use.
 
