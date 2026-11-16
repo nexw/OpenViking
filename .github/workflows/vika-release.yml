@@ -1,0 +1,43 @@
+# Temporary validation branch only: no release, deployment, secret or write permissions.
+name: Termux PR7749 isolated validation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: superagent
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.3'
+          cache: false
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - name: Focused POSIX installer and Termux lifecycle tests
+        run: node --test packages/cli/test/install.test.mjs packages/cli/test/termux.test.mjs packages/daemon/test/platform-interface.test.mjs packages/daemon/test/platform-isolation.test.mjs packages/updater/test/windows-artifacts.test.mjs
+      - name: Build native Termux artifact from unchanged mandatory npm graph
+        run: |
+          node scripts/build-release.mjs --platform termux-arm64 --out "${RUNNER_TEMP}/termux-dist"
+          cp scripts/install.sh "${RUNNER_TEMP}/termux-dist/install.sh"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: termux-pr7749-device
+          path: ${{ runner.temp }}/termux-dist/*
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+      - name: Unmodified desktop release path
+        run: node scripts/build-release.mjs --platform linux-x64 --out "${RUNNER_TEMP}/linux-dist"
+      - name: Full SuperAgent tests on Linux
+        run: npm test
