@@ -1,0 +1,56 @@
+name: Android Published Dependency Wheels
+
+# Mirror the compatible published subset unchanged. Missing native wheels are
+# reported explicitly; this is not a complete application distribution.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  published-wheels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test Android build helpers
+        run: python3 -m unittest discover -s tests/misc -p 'test_android*.py' -v
+      - uses: astral-sh/setup-uv@v7
+      - name: Load reviewed target
+        run: |
+          python3 -m scripts.build_support.android_target env --out "$RUNNER_TEMP/android-target.env"
+          cat "$RUNNER_TEMP/android-target.env" >> "$GITHUB_ENV"
+      - name: Set up pinned metadata tools
+        run: |
+          set -euo pipefail
+          uv python install "$ANDROID_BUILD_PYTHON"
+          uv venv --python "$ANDROID_BUILD_PYTHON" "$RUNNER_TEMP/published-build"
+          uv pip install --python "$RUNNER_TEMP/published-build/bin/python" 'packaging==26.3'
+      - name: Download and inspect the fixed published wheel set
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/published-build/bin/python" -m scripts.build_support.android_published_wheels \
+            --lock scripts/build_support/android_published_wheels.json \
+            --cache "$RUNNER_TEMP/published-cache" --out dist-android-published
+      - name: Include frozen input and checksums
+        run: |
+          set -euo pipefail
+          cp scripts/build_support/android_published_wheels.json dist-android-published/source-manifest.json
+          cp scripts/build_support/android_dependency_constraints.txt dist-android-published/
+          cp docs/en/guides/android-distribution.md dist-android-published/README.md
+          (cd dist-android-published && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+          {
+            echo '### Published Android/pure dependency wheels'
+            echo '- Fixed versions, upstream filenames/tags and SHA256; no wheel retagging'
+            echo '- CRC/metadata/tag/ELF checks, without executing downloaded code'
+            echo '- Missing native wheels are reported, not replaced with placeholders'
+            echo '- Full offline installation/service acceptance remain separate gates'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openviking-android-published-wheels
+          path: dist-android-published/
+          if-no-files-found: error
+          retention-days: 30

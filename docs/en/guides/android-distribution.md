@@ -191,8 +191,13 @@ The opt-in `Android Rust Dependency Wheels` workflow builds the current audited
 closure's `orjson==3.13.0`, `pydantic-core==2.50.4`, `jiter==0.19.0` and
 `rpds-py==2026.9.1`. It preserves their real upstream maturin/PyO3 modules and
 shipped Cargo locks. The support wheel `typing-extensions==4.16.0` is mirrored
-unchanged for normal offline dependency resolution. This stage is **not yet
-accepted** until its exact CI artifacts pass the device test.
+unchanged for normal offline dependency resolution. The actual NDK artifact from
+https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44033731115
+passed SHA256 verification, a fresh five-package offline/binary-only install
+with normal dependency resolution, `uv pip check`, and all four real functional
+tests on private Termux CPython 3.14.10 without LD_PRELOAD. The shared Rust
+cross-environment also passed the language-pack rebuild:
+https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44032288106
 
 The orjson build script uses build-host cfg for AVX-512 selection; a guarded
 source patch makes this decision use Cargo's target architecture/OS instead.
@@ -213,6 +218,22 @@ validation/serialization, and persistent Rust map/set operations—not just
 imports. Fastuuid needs its upstream `uuid_unstable` cfg preserved, and tiktoken
 needs a setuptools-rust adapter plus a reviewed Cargo lock; neither is silently
 substituted into this maturin-only stage.
+
+## Stage 4: unchanged published wheels
+
+`android_published_wheels.json` freezes filenames, source URLs and hashes for
+286 compatible wheels: 281 pure wheels and five published Android wheels. Its
+36-item source-build queue includes the 16 native distributions covered by the
+parser/language-pack/foundational-Rust stages; **20 native distributions remain**
+until further builders pass acceptance. The queue is explicit data, never
+placeholder wheels. Both queues partition the same 322-dependency constraints.
+
+The opt-in `Android Published Dependency Wheels` workflow mirrors these upstream
+wheels unchanged. It checks target tags (including compatible lower Android API
+levels), Requires-Python, metadata, CRC and native ELF dependencies without
+executing their code. No Linux wheel is relabeled. This download-only stage does
+not need a target sysroot or NDK; downloading the published subset is not a full
+installation or service test.
 
 ## Full-distribution acceptance criteria
 
