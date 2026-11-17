@@ -1,0 +1,400 @@
+name: Android Native Prebuild
+
+# Cross-compiles OpenViking's native artifacts for Termux (Android/bionic,
+# aarch64) with the Android NDK, so a phone never needs a Rust/C++ toolchain:
+#
+#   openviking/bin/ov                                  Rust CLI
+#   openviking/lib/ragfs_python.abi3.so                PyO3 RAGFS binding
+#   openviking/storage/vectordb/engine/_native.abi3.so C++ vectordb engine
+#
+# Why an NDK cross build and not the regular `_build.yml` wheel jobs: the two
+# extensions are stable-ABI (Py_LIMITED_API >= 3.10), so one build serves every
+# CPython Termux ships, but they must be linked against bionic. A manylinux/
+# glibc artifact is rejected by Android's linker ("cannot locate symbol
+# PyLong_Type") — and so is any other platform's prebuilt wheel.
+#
+# Outputs, all tagged `...android_24_arm64_v8a` so Termux's pip/uv accepts them:
+#   openviking-<ver>-cp310-abi3-android_24_arm64_v8a.whl    full package wheel
+#                                                           (carries all three)
+#   ragfs_python-<ver>-cp310-abi3-android_24_arm64_v8a.whl  standalone binding
+#   openviking-native-android-aarch64-<ver>.tar.gz          runtime bundle for
+#                                                           source checkouts
+#
+# Consume on the device, either way:
+#   pip install openviking-<ver>-cp310-abi3-android_24_arm64_v8a.whl --no-deps
+#   # or, for a source checkout:
+#   python scripts/build_support/android_native.py install \
+#       openviking-native-android-aarch64-<version>.tar.gz --root . --force
+#   export LD_PRELOAD=$PREFIX/lib/libpython3.14.so   # stable-ABI modules rely on
+#                                                    # the process-wide libpython
+#
+# Only hosted runners are used (see tests/misc/test_linux_runner.py): the NDK
+# cross-compiles aarch64 from x86_64, so no self-hosted pool is involved.
+
+on:
+  workflow_dispatch:
+    inputs:
+      android_api_level:
+        description: 'Minimum Android API level (Termux baseline)'
+        required: false
+        default: '24'
+      termux_repo:
+        description: 'Termux apt repository providing bionic CPython headers'
+        required: false
+        default: 'https://packages.termux.dev/apt/termux-main'
+      version:
+        description: 'Override the version stamped into ov (default: resolve from git)'
+        required: false
+        default: ''
+  workflow_call:
+    inputs:
+      android_api_level:
+        type: string
+        required: false
+        default: '24'
+      termux_repo:
+        type: string
+        required: false
+        default: 'https://packages.termux.dev/apt/termux-main'
+      version:
+        type: string
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'android-native-v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-native-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+jobs:
+  build:
+    name: Cross-build aarch64 (NDK)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      ANDROID_API_LEVEL: ${{ inputs.android_api_level || '24' }}
+      TERMUX_REPO: ${{ inputs.termux_repo || 'https://packages.termux.dev/apt/termux-main' }}
+      RUST_TARGET: aarch64-linux-android
+      TERMUX_ENV_FILE: ${{ runner.temp }}/termux-sysroot.env
+      # ccache is picked up by Cargo (cc-rs) and by the CMake build below.
+      CCACHE_MAXSIZE: 512M
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # setuptools_scm derives the version from tags.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      # The NDK cross build needs CPython artifacts that were compiled *for
+      # bionic*: pyconfig.h carries the Android-specific ABI settings, and
+      # find_package(Python3 COMPONENTS Development) also wants a libpython.
+      # Termux ships both in its single `python` deb, so we extract that instead
+      # of depending on a Termux container image.
+      - name: Resolve Termux CPython sysroot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/build_support/termux_sysroot.py \
+            --dest "$RUNNER_TEMP/termux-sysroot" \
+            --repo "$TERMUX_REPO" \
+            --write-env "$TERMUX_ENV_FILE"
+          cat "$TERMUX_ENV_FILE" >> "$GITHUB_ENV"
+
+      # CMake's FindPython3 rejects an interpreter whose minor version differs
+      # from the headers/libpython it was given, so the host interpreter must
+      # match the Termux one (currently 3.14). It is only used for
+      # `find_package(Python3 COMPONENTS Interpreter ...)`; nothing is executed
+      # against the target tree.
+      - name: Install a host CPython matching the Termux version
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv python install "$TERMUX_PY_VERSION"
+          host_py="$(uv python find "$TERMUX_PY_VERSION")"
+          "$host_py" -V
+          echo "HOST_PY=$host_py" >> "$GITHUB_ENV"
+
+      - name: Locate the Android NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ndk="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-${ANDROID_NDK:-}}}"
+          if [[ -z "$ndk" || ! -d "$ndk" ]]; then
+            echo '::error::no Android NDK on this runner (ANDROID_NDK_LATEST_HOME is unset)'
+            exit 1
+          fi
+          ndk_bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          cc="$ndk_bin/aarch64-linux-android${ANDROID_API_LEVEL}-clang"
+          if [[ ! -x "$cc" ]]; then
+            echo "::error::missing NDK compiler $cc"
+            exit 1
+          fi
+          {
+            echo "NDK_ROOT=$ndk"
+            echo "NDK_BIN=$ndk_bin"
+            echo "ANDROID_NDK_VERSION=$(basename "$ndk")"
+          } >> "$GITHUB_ENV"
+
+      # cc-rs/build-scripts pick the NDK up through the per-target CC/CXX/AR
+      # variables; the linker variable is what `cargo build --target` uses.
+      - name: Configure cargo for aarch64-linux-android
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc="$NDK_BIN/aarch64-linux-android${ANDROID_API_LEVEL}-clang"
+          api_def="-D__ANDROID_API__=${ANDROID_API_LEVEL}"
+          {
+            echo "CC_aarch64_linux_android=$cc"
+            echo "CXX_aarch64_linux_android=${cc}++"
+            echo "AR_aarch64_linux_android=$NDK_BIN/llvm-ar"
+            echo "RANLIB_aarch64_linux_android=$NDK_BIN/llvm-ranlib"
+            echo "CFLAGS_aarch64_linux_android=$api_def"
+            echo "CXXFLAGS_aarch64_linux_android=$api_def"
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$cc"
+          } >> "$GITHUB_ENV"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: aarch64-linux-android
+
+      - uses: ./.github/actions/compiler-cache
+        with:
+          target: aarch64-linux-android
+
+      - name: Resolve the OpenViking version
+        shell: bash
+        env:
+          VERSION_OVERRIDE: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$VERSION_OVERRIDE" ]]; then
+            version="$VERSION_OVERRIDE"
+          else
+            # `uv run --no-project`: the repo's own dependency set cannot resolve
+            # here (tree-sitter-php publishes platform wheels only) and we only
+            # need setuptools_scm to reproduce setup.py's version scheme.
+            version="$(uv run --no-project --with 'setuptools-scm>=8' python -c \
+              'import sys; sys.path.insert(0, "."); from scripts.build_support.versioning import resolve_openviking_version; print(resolve_openviking_version())')"
+          fi
+          echo "OPENVIKING_VERSION=$version" >> "$GITHUB_ENV"
+          echo "Resolved OpenViking version: $version"
+
+      # ov_cli links reqwest+rustls, so no OpenSSL is needed; every C dependency
+      # (ring, aws-lc, vendored sqlite/openssl from ragfs) is compiled by cc-rs
+      # with the NDK clang configured above.
+      - name: Build ov CLI
+        run: cargo build --release --locked --target "$RUST_TARGET" -p ov_cli
+
+      - name: Stage ov CLI
+        run: |
+          set -euo pipefail
+          mkdir -p openviking/bin
+          cp "target/$RUST_TARGET/release/ov" openviking/bin/ov
+          chmod +x openviking/bin/ov
+
+      # PyO3 cannot probe a target interpreter, but abi3 makes every probe
+      # unnecessary: the version comes from Cargo's `abi3-py310` feature.
+      # PYO3_NO_PYTHON is the documented fallback if the cross layout of the
+      # extracted Termux prefix is not recognised.
+      - name: Build ragfs-python (PyO3 abi3)
+        shell: bash
+        env:
+          PYO3_CROSS: '1'
+        run: |
+          set -euo pipefail
+          # Exported in the shell, not via `${{ env.* }}`: these come from
+          # $GITHUB_ENV, which expression evaluation cannot see.
+          export PYO3_CROSS_PYTHON_VERSION="$TERMUX_PY_VERSION"
+          export PYO3_CROSS_LIB_DIR="$TERMUX_PREFIX/lib"
+          if ! cargo build --release --locked --target "$RUST_TARGET" -p ragfs-python; then
+            echo '::warning::PyO3 cross layout rejected, retrying with PYO3_NO_PYTHON=1'
+            env -u PYO3_CROSS -u PYO3_CROSS_LIB_DIR -u PYO3_CROSS_PYTHON_VERSION \
+              PYO3_NO_PYTHON=1 \
+              cargo build --release --locked --target "$RUST_TARGET" -p ragfs-python
+          fi
+          mkdir -p openviking/lib
+          rm -f openviking/lib/ragfs_python*.so
+          cp "target/$RUST_TARGET/release/libragfs_python.so" \
+             openviking/lib/ragfs_python.abi3.so
+          chmod +x openviking/lib/ragfs_python.abi3.so
+
+      # Mirrors setup.py's cmake invocation, but driven directly so the Rust
+      # stages above are not rebuilt. `ANDROID_STL=c++_static` keeps the module
+      # free of a libc++_shared.so dependency (Termux ships it, but a wheel that
+      # does not need it is one less way to fail).
+      - name: Build the C++ vectordb engine (abi3)
+        shell: bash
+        run: |
+          set -euo pipefail
+          engine_dir="$GITHUB_WORKSPACE/openviking/storage/vectordb/engine"
+          mkdir -p "$engine_dir"
+          rm -f "$engine_dir"/*.so
+          cmake -S src -B build/android-aarch64 \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM="android-$ANDROID_API_LEVEL" \
+            -DANDROID_STL=c++_static \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DOV_PY_OUTPUT_DIR="$engine_dir" \
+            -DOV_PY_EXT_SUFFIX=.abi3.so \
+            -DPython3_FIND_STRATEGY=LOCATION \
+            -DPython3_FIND_IMPLEMENTATIONS=CPython \
+            -DPython3_EXECUTABLE="$HOST_PY" \
+            -DPython3_INCLUDE_DIR="$TERMUX_PY_INCLUDE_DIR" \
+            -DPython3_INCLUDE_DIRS="$TERMUX_PY_INCLUDE_DIR" \
+            -DPython3_LIBRARY="$TERMUX_PY_LIBRARY"
+          cmake --build build/android-aarch64 --config Release -j"$(nproc)"
+
+      # Fails when an artifact is missing, is not AArch64, was linked against
+      # glibc/libpython, or does not export its PyInit_ symbol.
+      - name: Verify the native artifacts
+        run: python3 scripts/build_support/android_native.py verify --root .
+
+      # Studio is optional: the server works without the /studio bundle, so a
+      # Vite failure must not block the native artifacts.
+      - name: Build the Studio bundle (best effort)
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd web-studio
+          npm ci --no-audit --no-fund
+          npm run build -- --base=/studio/
+          rm -rf ../openviking/web_studio/dist
+          cp -r dist ../openviking/web_studio/dist
+
+      # No PEP 517 isolation: `[build-system].requires` pins cmake + the
+      # tree-sitter grammars, which do not resolve on a runner either.
+      - name: Install wheel-build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv venv --python "$HOST_PY" "$RUNNER_TEMP/wheel-venv"
+          uv pip install --python "$RUNNER_TEMP/wheel-venv/bin/python" \
+            'setuptools>=61' 'setuptools-scm>=8' wheel 'maturin>=1.10,<2'
+
+      - name: Build ragfs-python wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYO3_CROSS_PYTHON_VERSION="$TERMUX_PY_VERSION"
+          export PYO3_CROSS_LIB_DIR="$TERMUX_PREFIX/lib"
+          mkdir -p dist-android
+          cd crates/ragfs-python
+          "$RUNNER_TEMP/wheel-venv/bin/maturin" build --release --locked \
+            --target "$RUST_TARGET" --out "$GITHUB_WORKSPACE/dist-android"
+
+      # Reuses the cross-built artifacts: every native stage of setup.py is
+      # skipped, and package_data ships bin/ov, lib/ragfs_python*.so and
+      # storage/vectordb/engine/*.abi3.so inside the wheel.
+      - name: Build openviking wheel
+        shell: bash
+        env:
+          OV_SKIP_CPP_BUILD: '1'
+          OV_SKIP_OV_BUILD: '1'
+          OV_SKIP_RAGFS_BUILD: '1'
+          OV_REQUIRE_RAGFS_BUILD: '0'
+        run: |
+          set -euo pipefail
+          export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_OPENVIKING="$OPENVIKING_VERSION"
+          "$RUNNER_TEMP/wheel-venv/bin/python" setup.py bdist_wheel \
+            --plat-name android_24_arm64_v8a --dist-dir dist-android
+
+      - name: Inspect the wheels
+        run: python3 scripts/build_support/android_native.py wheel-check --dist dist-android
+
+      - name: Package the runtime bundle
+        run: |
+          python3 scripts/build_support/android_native.py bundle \
+            --root . \
+            --out dist-android \
+            --version "$OPENVIKING_VERSION" \
+            --android-api "$ANDROID_API_LEVEL" \
+            --ndk "$ANDROID_NDK_VERSION" \
+            --termux-python "$TERMUX_PY_VERSION"
+
+      # Exercises the restore path the device will run, so a broken manifest or
+      # checksum fails here instead of in Termux.
+      - name: Round-trip the bundle
+        run: |
+          set -euo pipefail
+          python3 scripts/build_support/android_native.py install \
+            dist-android/openviking-native-android-aarch64-*.tar.gz \
+            --root "$RUNNER_TEMP/restored" --ignore-arch
+          diff <(cd "$RUNNER_TEMP/restored" && find openviking -type f | sort) \
+               <(cd . && python3 -c "import sys; sys.path.insert(0, 'scripts/build_support'); import android_native; print('\n'.join(sorted(android_native.ARTIFACTS)))")
+
+      - name: Summarize
+        shell: bash
+        run: |
+          {
+            echo "### Android native prebuild (aarch64 / bionic)"
+            echo
+            echo "- NDK: \`$ANDROID_NDK_VERSION\`, API level $ANDROID_API_LEVEL"
+            echo "- Termux CPython: \`$TERMUX_PACKAGE\`"
+            echo "- Bundle: \`$(basename dist-android/*.tar.gz)\`"
+            echo
+            echo '```'
+            sha256sum dist-android/*.whl dist-android/*.tar.gz
+            echo '```'
+            echo
+            echo "On Termux: \`pip install dist-android/openviking-*.whl --no-deps\`"
+            echo "(or \`python scripts/build_support/android_native.py install <bundle> --root . --force\`),"
+            echo "then \`export LD_PRELOAD=\$PREFIX/lib/libpython$TERMUX_PY_VERSION.so\` before importing."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openviking-native-android-aarch64
+          path: |
+            dist-android/*.whl
+            dist-android/*.tar.gz
+            dist-android/*.sha256
+            dist-android/manifest.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ov-android-aarch64
+          path: openviking/bin/ov
+          if-no-files-found: error
+          retention-days: 30
+
+  attach-release:
+    name: Attach bundle to release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/android-native-v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: openviking-native-android-aarch64
+          path: dist-android
+
+      # Only uploads to a release that already exists; creating one here would
+      # re-enter release.yml and publish an android-only tag through the regular
+      # wheel/publish pipeline.
+      - name: Upload assets to an existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist-android/* --clobber
+          else
+            echo "::warning::release $TAG does not exist; assets stay on this run"
+          fi
