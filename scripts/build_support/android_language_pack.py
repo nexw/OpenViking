@@ -21,6 +21,7 @@ import zipfile
 from pathlib import Path
 
 from scripts.build_support.android_parser_wheels import fetch_source, inspect_wheel, sha256, unpack_source
+from scripts.build_support.android_rust_common import build_environment as rust_environment
 
 DEFAULT_MANIFEST = Path(__file__).with_name("android_language_pack_sources.json")
 OFFLINE_ERROR = (
@@ -128,36 +129,15 @@ def patch_cpp_names(project: Path, archive: Path) -> dict:
 
 def build_environment(prefix: Path, version: str, api: int, cc: str,
                       bundle: Path, languages: list[str]) -> dict:
-    if not (prefix / "lib" / f"libpython{version}.so").is_file():
-        raise ValueError("missing target libpython")
-    if any(char.isspace() for char in str(prefix)):
-        raise ValueError("the Rust target prefix must not contain whitespace")
+    env = rust_environment(prefix, version, api, cc)
     if not languages or any(not re.fullmatch(r"[a-z][a-z0-9_]*", name) for name in languages):
         raise ValueError("invalid embedded language list")
-    env = os.environ.copy()
-    for key in ("PYO3_NO_PYTHON", "PYO3_CONFIG_FILE", "PYO3_PYTHON", "PYTHONHOME", "RUSTFLAGS",
-                "CARGO_ENCODED_RUSTFLAGS", "PROJECT_ROOT"):
-        env.pop(key, None)
-    ndk_bin = Path(cc).parent
     env.update({
-        "PYO3_CROSS": "1", "PYO3_CROSS_PYTHON_VERSION": version,
-        "PYO3_CROSS_LIB_DIR": str(prefix / "lib"),
-        "CC_aarch64_linux_android": cc, "CXX_aarch64_linux_android": cc + "++",
-        "AR_aarch64_linux_android": str(ndk_bin / "llvm-ar"),
-        "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER": cc,
-        # Explicitly keep libpython even if maturin suppresses PyO3's link lines.
-        "CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS": (
-            f"-Lnative={prefix / 'lib'} -Clink-arg=-Wl,--no-as-needed "
-            f"-Clink-arg=-lpython{version} -Clink-arg=-Wl,--no-undefined"
-        ),
         "TSLP_LINK_MODE": "static", "TSLP_LANGUAGES": ",".join(languages),
         "TSLP_SOURCE_BUNDLE_URL": bundle.resolve().as_uri(),
         # Upstream build.rs treats TSLP_OFFLINE=1 as 'do not unpack any bundle',
         # including a local file. Runtime network is disabled through Cargo features.
         "TSLP_OFFLINE": "0", "TSLP_ALLOW_FAILED_GRAMMARS": "0",
-        "CARGO_BUILD_JOBS": env.get("CARGO_BUILD_JOBS", "2"),
-        "CARGO_PROFILE_RELEASE_LTO": "false",
-        "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
     })
     return env
 
