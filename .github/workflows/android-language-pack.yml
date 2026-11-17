@@ -1,0 +1,98 @@
+name: Android Offline Language Pack
+
+# Prototype dependency build: the embedded set is explicit and unsupported
+# languages/download APIs fail closed. Do not attach this to releases yet.
+on:
+  workflow_dispatch:
+    inputs:
+      android_api_level:
+        description: Minimum Android API (>=24)
+        default: '24'
+      termux_repo:
+        description: Termux repository for target Python headers and libpython
+        default: https://packages.termux.dev/apt/termux-main
+  workflow_call:
+    inputs:
+      android_api_level:
+        type: string
+        default: '24'
+      termux_repo:
+        type: string
+        default: https://packages.termux.dev/apt/termux-main
+
+permissions:
+  contents: read
+
+jobs:
+  language-pack:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      ANDROID_API_LEVEL: ${{ inputs.android_api_level || '24' }}
+      TERMUX_REPO: ${{ inputs.termux_repo || 'https://packages.termux.dev/apt/termux-main' }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test language-pack build helpers
+        run: python3 -m unittest discover -s tests/misc -p test_android_language_pack.py -v
+      - uses: astral-sh/setup-uv@v7
+      - name: Extract target Python and install matching build tools
+        run: |
+          set -euo pipefail
+          python3 scripts/build_support/termux_sysroot.py \
+            --dest "$RUNNER_TEMP/termux-sysroot" --repo "$TERMUX_REPO" \
+            --write-env "$RUNNER_TEMP/termux-python.env"
+          cat "$RUNNER_TEMP/termux-python.env" >> "$GITHUB_ENV"
+      - name: Locate NDK and build Python
+        run: |
+          set -euo pipefail
+          uv python install "$TERMUX_PY_VERSION"
+          uv venv --python "$TERMUX_PY_VERSION" "$RUNNER_TEMP/language-pack-build"
+          uv pip install --python "$RUNNER_TEMP/language-pack-build/bin/python" \
+            'maturin==1.15.0' 'wheel==0.48.0'
+          ndk="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-${ANDROID_NDK:-}}}"
+          test -d "$ndk"
+          ndk_bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$ndk_bin/aarch64-linux-android${ANDROID_API_LEVEL}-clang"
+          {
+            echo "NDK_BIN=$ndk_bin"
+            echo "NDK_VERSION=$(basename "$ndk")"
+          } >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: aarch64-linux-android
+      - name: Build actual offline language-pack implementation
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/language-pack-build/bin/python" -m scripts.build_support.android_language_pack \
+            --target-prefix "$TERMUX_PREFIX" --python-version "$TERMUX_PY_VERSION" \
+            --android-api "$ANDROID_API_LEVEL" \
+            --cc "$NDK_BIN/aarch64-linux-android${ANDROID_API_LEVEL}-clang" \
+            --readelf "$NDK_BIN/llvm-readelf" --cache "$RUNNER_TEMP/language-pack-sources" \
+            --out dist-android-language-pack --resolve-lock
+      - name: Include source manifest, device tests and checksums
+        run: |
+          set -euo pipefail
+          cp scripts/build_support/android_language_pack_sources.json dist-android-language-pack/source-manifest.json
+          cp scripts/build_support/android_language_pack_smoke.py dist-android-language-pack/
+          (cd dist-android-language-pack && sha256sum *.whl > SHA256SUMS)
+          {
+            echo '### Offline Android language-pack prototype'
+            echo "- NDK $NDK_VERSION; Python $TERMUX_PY_VERSION; Android API $ANDROID_API_LEVEL"
+            echo '- Explicit embedded grammar set; real upstream process/prefetch implementation'
+            echo '- Network and dynamic grammar loading disabled at compile time'
+            echo '- Download/cache-management APIs explicitly unsupported'
+            echo '- Device acceptance tests and remaining application dependencies are separate gates'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openviking-android-offline-language-pack
+          path: dist-android-language-pack/
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openviking-android-language-pack-sources
+          path: ${{ runner.temp }}/language-pack-sources/
+          if-no-files-found: error
+          retention-days: 30
