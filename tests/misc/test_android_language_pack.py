@@ -11,6 +11,7 @@ import json
 import os
 import re
 import tempfile
+import tarfile
 import tomllib
 import unittest
 from pathlib import Path
@@ -375,6 +376,49 @@ class CommandLineTests(TemporaryTestCase):
         self.assertFalse((self.directory / "out").exists())
 
 
+class CorePatchTests(TemporaryTestCase):
+    def make_core(self, text=None):
+        if text is None:
+            text = ('fn resolve_structure_name(node: &tree_sitter::Node, source: &str) '
+                    '-> Option<String> {\n'
+                    '    for target_kind in &["type_identifier", "identifier", "scoped_identifier"] {\n'
+                    '    }\n    None\n}\n')
+        archive = self.directory / "core.crate"
+        with tarfile.open(archive, "w:gz") as tar:
+            payload = text.encode()
+            member = tarfile.TarInfo("tree-sitter-language-pack-1.13.3/src/intel/intelligence.rs")
+            member.size = len(payload)
+            tar.addfile(member, io.BytesIO(payload))
+        project = self.directory / "project"
+        project.mkdir(exist_ok=True)
+        (project / "Cargo.toml").write_text("[workspace]\n")
+        return project, archive
+
+    def test_nested_cpp_declarators_use_pinned_real_core_override(self):
+        project, archive = self.make_core()
+        result = pack.patch_cpp_names(project, archive)
+        source = project / "vendor/tree-sitter-language-pack-1.13.3/src/intel/intelligence.rs"
+        text = source.read_text()
+        self.assertIn('node.child_by_field_name("declarator")', text)
+        self.assertIn('resolve_structure_name(&declarator, source)', text)
+        self.assertIn('"operator_name" | "destructor_name"', text)
+        self.assertEqual(result["patched_intelligence_sha256"], pack.sha256(source))
+        cargo = tomllib.loads((project / "Cargo.toml").read_text())
+        self.assertEqual(cargo["patch"]["crates-io"]["tree-sitter-language-pack"]["path"],
+                         "vendor/tree-sitter-language-pack-1.13.3")
+
+    def test_core_drift_is_rejected(self):
+        project, archive = self.make_core("// source changed\n")
+        with self.assertRaisesRegex(ValueError, "review C\\+\\+ patch"):
+            pack.patch_cpp_names(project, archive)
+
+    def test_unreviewed_existing_workspace_patch_is_rejected(self):
+        project, archive = self.make_core()
+        (project / "Cargo.toml").write_text("[workspace]\n[patch.crates-io]\n")
+        with self.assertRaisesRegex(ValueError, "workspace patches changed"):
+            pack.patch_cpp_names(project, archive)
+
+
 class ManifestTests(unittest.TestCase):
     def test_versioned_sources_have_the_reviewed_exact_hashes(self):
         manifest = json.loads(pack.DEFAULT_MANIFEST.read_text())
@@ -384,6 +428,11 @@ class ManifestTests(unittest.TestCase):
                 "tree-sitter-language-pack",
                 "https://files.pythonhosted.org/packages/cb/9e/01be7a94fc69204350dc99707730aa4f32906cdb8b0b5856ff43fd0c60d5/tree_sitter_language_pack-1.13.3.tar.gz",
                 "e0e0287bf5a2f3d8a382136b1565206988417ece502b796f4b6f7fefb832963c",
+            ),
+            "core_source": (
+                "tree-sitter-language-pack-core",
+                "https://static.crates.io/crates/tree-sitter-language-pack/tree-sitter-language-pack-1.13.3.crate",
+                "345ee6dd864ca9f9e846120d5546082a27e946e1b129a55e7c6d4b1fc5cddec3",
             ),
             "grammar_source": (
                 "parser-sources",

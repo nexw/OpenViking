@@ -59,6 +59,14 @@ def main(argv=None):
             results.append({"language": language, "structure_names": names})
             print(f"PASS real parse/process/prefetch: {language}", flush=True)
 
+        cpp = pack.process(
+            "int *hello_ptr() { return nullptr; }\n"
+            "namespace demo { int hello_nested() { return 1; } }",
+            pack.ProcessConfig(language="cpp", structure=True, imports=True),
+        )
+        assert {"hello_ptr", "hello_nested"}.issubset(structure_names(cpp.structure))
+        print("PASS C++ pointer and nested declarator regression", flush=True)
+
         started = time.monotonic()
         assert not pack.has_language("ruby"), "unembedded Ruby advertised as available"
         assert pack.detect_language("example.rb") == "ruby"
