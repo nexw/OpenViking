@@ -31,7 +31,10 @@ def sha256(path: Path) -> str:
 
 def fetch_source(source: dict, cache: Path) -> Path:
     cache.mkdir(parents=True, exist_ok=True)
-    archive = cache / f"{source['name']}-{source['version']}.tar.gz"
+    filename = source.get("filename", f"{source['name']}-{source['version']}.tar.gz")
+    if Path(filename).name != filename:
+        raise ValueError("source cache filename must not contain directories")
+    archive = cache / filename
     if not archive.exists() or sha256(archive) != source["sha256"]:
         error = None
         for _ in range(3):
