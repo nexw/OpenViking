@@ -1,0 +1,122 @@
+name: Android Rust Dependency Wheels
+
+# Opt-in dependency component, not a complete OpenViking release.
+on:
+  workflow_dispatch:
+    inputs:
+      android_api_level:
+        description: Minimum Android API (>=24)
+        default: '24'
+      termux_repo:
+        description: Termux repository for the independently pinned Python deb
+        default: https://packages.termux.dev/apt/termux-main
+      packages:
+        description: Optional space-separated subset of the pinned package names
+        default: ''
+  workflow_call:
+    inputs:
+      android_api_level:
+        type: string
+        default: '24'
+      termux_repo:
+        type: string
+        default: https://packages.termux.dev/apt/termux-main
+      packages:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  rust-wheels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      ANDROID_API_LEVEL: ${{ inputs.android_api_level || '24' }}
+      TERMUX_REPO: ${{ inputs.termux_repo || 'https://packages.termux.dev/apt/termux-main' }}
+      PACKAGE_SUBSET: ${{ inputs.packages || '' }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test Android build helpers
+        run: python3 -m unittest discover -s tests/misc -p 'test_android*.py' -v
+      - uses: astral-sh/setup-uv@v7
+      - name: Load reviewed target pins
+        run: |
+          python3 -m scripts.build_support.android_target env --out "$RUNNER_TEMP/android-target.env"
+          cat "$RUNNER_TEMP/android-target.env" >> "$GITHUB_ENV"
+      - name: Verify and extract target Python
+        run: |
+          set -euo pipefail
+          python3 scripts/build_support/termux_sysroot.py \
+            --dest "$RUNNER_TEMP/termux-sysroot" --repo "$TERMUX_REPO" \
+            --python-version "$TERMUX_PY_VERSION_PIN" \
+            --expected-sha256 "$TERMUX_PYTHON_DEB_SHA256" \
+            --write-env "$RUNNER_TEMP/termux-python.env"
+          cat "$RUNNER_TEMP/termux-python.env" >> "$GITHUB_ENV"
+      - name: Set up pinned build interpreter and NDK
+        run: |
+          set -euo pipefail
+          uv python install "$ANDROID_BUILD_PYTHON"
+          uv venv --python "$ANDROID_BUILD_PYTHON" "$RUNNER_TEMP/rust-build"
+          uv pip install --python "$RUNNER_TEMP/rust-build/bin/python" \
+            'maturin==1.16.0' 'wheel==0.48.0' 'typing-extensions==4.16.0'
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$sdk"
+          ndk="$sdk/ndk/$ANDROID_NDK_REVISION"
+          if [[ ! -d "$ndk" ]]; then
+            sdkmanager --install "ndk;$ANDROID_NDK_REVISION"
+          fi
+          ndk_bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$ndk_bin/aarch64-linux-android${ANDROID_API_LEVEL}-clang"
+          {
+            echo "NDK_BIN=$ndk_bin"
+            echo "NDK_VERSION=$(awk -F'= ' '/^Pkg.Revision/ {print $2}' "$ndk/source.properties")"
+          } >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: ${{ env.ANDROID_RUST_TOOLCHAIN }}
+          targets: aarch64-linux-android
+      - name: Build pinned native dependencies
+        run: |
+          set -euo pipefail
+          subset=()
+          if [[ -n "$PACKAGE_SUBSET" ]]; then
+            read -r -a names <<< "$PACKAGE_SUBSET"
+            subset=(--packages "${names[@]}")
+          fi
+          "$RUNNER_TEMP/rust-build/bin/python" -m scripts.build_support.android_rust_wheels \
+            --target-prefix "$TERMUX_PREFIX" --python-version "$TERMUX_PY_VERSION" \
+            --android-api "$ANDROID_API_LEVEL" \
+            --cc "$NDK_BIN/aarch64-linux-android${ANDROID_API_LEVEL}-clang" \
+            --readelf "$NDK_BIN/llvm-readelf" --cache "$RUNNER_TEMP/rust-sources" \
+            --out dist-android-rust "${subset[@]}"
+      - name: Include provenance and device acceptance test
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/rust-build/bin/python" -m scripts.build_support.android_target record \
+            --prefix "$TERMUX_PREFIX" \
+            --compiler "$NDK_BIN/aarch64-linux-android${ANDROID_API_LEVEL}-clang" \
+            --out dist-android-rust/toolchain.json
+          cp scripts/build_support/android_rust_sources.json dist-android-rust/source-manifest.json
+          cp scripts/build_support/android_rust_smoke.py dist-android-rust/
+          (cd dist-android-rust && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+          {
+            echo '### Android Rust dependency component'
+            echo "- NDK $NDK_VERSION; Python $TERMUX_PY_VERSION; Android API $ANDROID_API_LEVEL"
+            echo '- Authentic pinned upstream sources and Cargo locks'
+            echo '- Exact-minor Android wheels; no glibc retagging'
+            echo '- Device acceptance and full application closure remain separate gates'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openviking-android-rust-wheels
+          path: dist-android-rust/
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openviking-android-rust-sources
+          path: ${{ runner.temp }}/rust-sources/
+          if-no-files-found: error
+          retention-days: 30

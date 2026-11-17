@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "packages": [
+    {
+      "name": "orjson",
+      "version": "3.13.0",
+      "url": "https://files.pythonhosted.org/packages/f2/72/380b97dc45bd162d23afe5194721ef678d9eac7cfaa549fe2873f7f0a518/orjson-3.13.0.tar.gz",
+      "sha256": "d1de5eb04485110c5da4c657e49168995d55e076b1ce60f1a042e254f4186c4f",
+      "filename": "orjson-3.13.0.tar.gz",
+      "cargo_manifest": "Cargo.toml",
+      "sdist_cargo_lock": {
+        "path": "Cargo.lock",
+        "sha256": "390b4f0b2c4cc36f64bb1dddc8ed1dde1fa4a1819c1dbda385d4db9f1e3d7b36",
+        "format": 4,
+        "packages": 23
+      },
+      "patch": "orjson-target-avx512"
+    },
+    {
+      "name": "pydantic-core",
+      "version": "2.50.4",
+      "url": "https://files.pythonhosted.org/packages/9c/0f/34f9ce4ba701dd0b815033ef94d99b56f66200e578ee6052aa3ac26f064e/pydantic_core-2.50.4.tar.gz",
+      "sha256": "aead3b74b68396bf0feab5d57e050b730ded7df55853c1e048a87e00aaf033c6",
+      "filename": "pydantic_core-2.50.4.tar.gz",
+      "cargo_manifest": "Cargo.toml",
+      "sdist_cargo_lock": {
+        "path": "Cargo.lock",
+        "sha256": "f286c07f698156f8d3e2b3a367e9416f1f54be736e5db9ef79cc7153df91c0df",
+        "format": 4,
+        "packages": 102
+      }
+    },
+    {
+      "name": "jiter",
+      "version": "0.19.0",
+      "url": "https://files.pythonhosted.org/packages/67/de/8dfd06a2153d8ab6a83a8ca8f8ae3ff860ce2fe324ee6a5d05294b621c2a/jiter-0.19.0.tar.gz",
+      "sha256": "ba3064f8be276d7cfb83c2fb85c858be533da2c2f80f9b048c3781b45a57a195",
+      "filename": "jiter-0.19.0.tar.gz",
+      "cargo_manifest": "crates/jiter-python/Cargo.toml",
+      "sdist_cargo_lock": {
+        "path": "Cargo.lock",
+        "sha256": "759a9868d0e438e88320e1332f12cbb78270665e757956952754a46f2de003b5",
+        "format": 4,
+        "packages": 133
+      }
+    },
+    {
+      "name": "rpds-py",
+      "version": "2026.9.1",
+      "url": "https://files.pythonhosted.org/packages/42/68/3bd46b8a5e01d3c2ebdf9c5e9497912e3fe0cde02bac21a7130ca866e403/rpds_py-2026.9.1.tar.gz",
+      "sha256": "4793ef7f78268b124b73fa933440f01d258bbae01de9fa53e9080c9ab0425a12",
+      "filename": "rpds_py-2026.9.1.tar.gz",
+      "cargo_manifest": "Cargo.toml",
+      "sdist_cargo_lock": {
+        "path": "Cargo.lock",
+        "sha256": "b192e1f95bae7419b4b83186d168e9ee1fc4d9622db236311318be6d6f52b5ee",
+        "format": 4,
+        "packages": 19
+      }
+    }
+  ],
+  "support_wheels": [
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "filename": "typing_extensions-4.16.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+      "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+    }
+  ]
+}

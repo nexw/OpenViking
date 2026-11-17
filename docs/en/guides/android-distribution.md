@@ -90,8 +90,12 @@ complete OpenViking service.
 A recorded dependency audit of the current native prototype resolved 323
 packages. Before building the standalone parser set, 35 dependencies lacked a
 compatible published Android/pure wheel; PHP was already supplied locally. The
-standalone stage covers 10 of those 35. Counts are a snapshot, not a permanent
-lockfile: remaining dependency/build versions must be pinned for a release.
+standalone stage covers 10 of those 35. The successful 322-dependency snapshot is
+now recorded in `scripts/build_support/android_dependency_constraints.txt`, and
+component tests require their pins to agree with that snapshot. Apply it with
+`-c` while normally resolving OpenViking. It is a **candidate constraints file**,
+not proof that every wheel exists or a hash-complete release lock; remaining
+sources/build inputs and all runtime acceptance gates still need validation.
 
 Remaining source-build groups include:
 
@@ -163,6 +167,52 @@ policy. It verifies socket creation returns EPERM; unsupported kernels fail the
 requested test explicitly instead of silently skipping enforcement. The normal
 smoke test can also run without that flag. No system Python or global loader
 configuration needs to be changed.
+
+### Locked parser-component acceptance
+
+The pinned workflows were rerun, and their exact downloadable artifacts were
+installed together in a **new** private CPython 3.14.10 venv using normal
+dependency resolution, `--no-index --only-binary=:all:`, and no system
+site-packages. All 14 distributions passed `uv pip check`; the shipped smoke
+scripts passed all 12 standalone parse variants and all 11 language-pack
+variants, C++ regressions, grep-ast integration and seccomp-enforced offline
+tests. No LD_PRELOAD was used.
+
+- Pinned standalone parsers: https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44028777341
+- Pinned language-pack: https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44028772195
+
+These verification-repository URLs are historical evidence, not workflow
+configuration. Upstream-owned artifact/device acceptance must be repeated when
+upstream enables the workflows.
+
+## Stage 3: foundational Rust dependencies
+
+The opt-in `Android Rust Dependency Wheels` workflow builds the current audited
+closure's `orjson==3.13.0`, `pydantic-core==2.50.4`, `jiter==0.19.0` and
+`rpds-py==2026.9.1`. It preserves their real upstream maturin/PyO3 modules and
+shipped Cargo locks. The support wheel `typing-extensions==4.16.0` is mirrored
+unchanged for normal offline dependency resolution. This stage is **not yet
+accepted** until its exact CI artifacts pass the device test.
+
+The orjson build script uses build-host cfg for AVX-512 selection; a guarded
+source patch makes this decision use Cargo's target architecture/OS instead.
+Patch/source/lock hashes, genuine license notices, exact-minor tags and native
+linkage are recorded and checked. Missing locks are errors, not an invitation to
+resolve new versions silently. The separate source manifest uses the successful
+322-dependency audit, not the repository's older uv.lock-derived snapshot.
+
+```sh
+sha256sum -c SHA256SUMS
+python -m pip install --no-index --only-binary=:all: --find-links . \\
+  orjson==3.13.0 pydantic-core==2.50.4 jiter==0.19.0 rpds-py==2026.9.1
+python android_rust_smoke.py --manifest source-manifest.json --output rust-smoke.json
+```
+
+The functional test checks JSON roundtrips/error handling, actual pydantic-core
+validation/serialization, and persistent Rust map/set operations—not just
+imports. Fastuuid needs its upstream `uuid_unstable` cfg preserved, and tiktoken
+needs a setuptools-rust adapter plus a reviewed Cargo lock; neither is silently
+substituted into this maturin-only stage.
 
 ## Full-distribution acceptance criteria
 
