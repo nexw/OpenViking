@@ -376,6 +376,23 @@ class CommandLineTests(TemporaryTestCase):
         self.assertFalse((self.directory / "out").exists())
 
 
+    def test_unreviewed_lock_is_rejected_before_sources_are_fetched(self):
+        lock = self.directory / "unreviewed.lock"
+        lock.write_text("not the reviewed workspace lock\n")
+        arguments = [
+            "--target-prefix", str(self.directory / "target"),
+            "--python-version", f"{pack.sys.version_info.major}.{pack.sys.version_info.minor}",
+            "--cc", "target-clang", "--cache", str(self.directory / "cache"),
+            "--out", str(self.directory / "out"), "--cargo-lock", str(lock),
+        ]
+        with mock.patch.object(pack, "fetch_source") as fetch:
+            with mock.patch("sys.stderr", new_callable=io.StringIO) as error:
+                with self.assertRaises(SystemExit):
+                    pack.main(arguments)
+            self.assertIn("independently pinned SHA256", error.getvalue())
+            fetch.assert_not_called()
+
+
 class CorePatchTests(TemporaryTestCase):
     def make_core(self, text=None):
         if text is None:
@@ -448,6 +465,11 @@ class ManifestTests(unittest.TestCase):
                 self.assertEqual(source["url"], url)
                 self.assertEqual(source["sha256"], checksum)
                 self.assertRegex(source["sha256"], r"^[0-9a-f]{64}$")
+
+    def test_workspace_lock_matches_reviewed_digest(self):
+        manifest = json.loads(pack.DEFAULT_MANIFEST.read_text())
+        lock = ROOT / "scripts/build_support/android_language_pack.Cargo.lock"
+        self.assertEqual(hashlib.sha256(lock.read_bytes()).hexdigest(), manifest["cargo_lock_sha256"])
 
     def test_embedded_languages_are_explicit_and_reviewed_not_all(self):
         manifest = json.loads(pack.DEFAULT_MANIFEST.read_text())

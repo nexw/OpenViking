@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "architecture": "aarch64",
+  "minimum_android_api": 24,
+  "python_minor": "3.14",
+  "build_python": "3.14.10",
+  "termux_python_package": "3.14.10",
+  "termux_python_deb_sha256": "1a5a300c8d844f2c18a3bb61cafbffb2e93fba9a7106ebe967f06c9628d1e434",
+  "ndk_revision": "30.0.16248370",
+  "rust_toolchain": "1.100.0"
+}

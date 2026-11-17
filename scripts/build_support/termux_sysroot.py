@@ -23,6 +23,7 @@ import argparse
 import gzip
 import hashlib
 import io
+import json
 import lzma
 import os
 import shutil
@@ -109,7 +110,7 @@ def resolve_package(
         for stanza in parse_packages(_decompress(candidate, payload).decode("utf-8", "replace")):
             if stanza.get("Package") != package:
                 continue
-            if version_prefix and not stanza.get("Version", "").startswith(version_prefix):
+            if version_prefix and not stanza.get("Version", "").startswith(version_prefix + "."):
                 continue
             return stanza
         errors.append(f"{url} has no '{package}' stanza")
@@ -232,26 +233,40 @@ def materialize(
     dest: Path,
     reuse: bool = True,
     version_prefix: str = "",
+    expected_sha256: str = "",
 ) -> dict[str, str]:
-    """Download + extract the Termux ``package`` and describe the CPython prefix."""
+    """Download + extract the Termux package, optionally enforcing an independent pin."""
     dest = dest.resolve()
     stanza = resolve_package(repo, arch, package, version_prefix)
     deb = download_package(stanza, repo, dest / "_downloads")
+    digest = _sha256(deb)
+    if expected_sha256 and digest != expected_sha256:
+        raise RuntimeError("Termux Python deb does not match the independently pinned SHA256")
     extract_root = dest / "root"
-    prefix = find_prefix(extract_root) if reuse and extract_root.is_dir() else None
+    marker = dest / "sysroot-source.json"
+    identity = {"deb_sha256": digest, "arch": arch, "package": package,
+                "version": stanza.get("Version", "")}
+    try:
+        reusable = json.loads(marker.read_text()) == identity
+    except (FileNotFoundError, ValueError):
+        reusable = False
+    prefix = find_prefix(extract_root) if reuse and reusable and extract_root.is_dir() else None
     if prefix is None:
         if extract_root.exists():
             shutil.rmtree(extract_root)
         extract_deb(deb, extract_root)
         prefix = find_prefix(extract_root)
+        marker.write_text(json.dumps(identity, indent=2) + "\n")
     env = describe_python(prefix)
-    if version_prefix and not env["TERMUX_PY_VERSION"].startswith(version_prefix):
+    if version_prefix and env["TERMUX_PY_VERSION"] != version_prefix:
         raise RuntimeError(
             f"resolved CPython {env['TERMUX_PY_VERSION']} does not match the requested "
             f"{version_prefix}"
         )
     env["TERMUX_PACKAGE"] = f"{package}={stanza.get('Version', 'unknown')}"
     env["TERMUX_DEB"] = str(deb)
+    env["TERMUX_DEB_SHA256"] = digest
+    env["TERMUX_REPO"] = repo
     return env
 
 
@@ -272,6 +287,8 @@ def main(argv: list[str] | None = None) -> int:
         default=os.environ.get("TERMUX_PY_VERSION_PIN", ""),
         help="pin the CPython minor version, e.g. 3.13 (default: newest in the repo)",
     )
+    parser.add_argument("--expected-sha256", default="",
+                        help="independent trusted target-deb SHA256, verified before extraction")
     parser.add_argument("--write-env", type=Path, help="write KEY=VALUE lines to this file")
     parser.add_argument("--no-reuse", action="store_true", help="re-extract the deb every run")
     args = parser.parse_args(argv)
@@ -283,6 +300,7 @@ def main(argv: list[str] | None = None) -> int:
         dest=args.dest,
         reuse=not args.no_reuse,
         version_prefix=args.python_version,
+        expected_sha256=args.expected_sha256,
     )
     for key, value in env.items():
         print(f"{key}={value}")

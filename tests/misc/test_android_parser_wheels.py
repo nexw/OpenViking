@@ -6,6 +6,7 @@ import io
 import json
 import os
 import runpy
+import sys
 import tarfile
 import tempfile
 import tomllib
@@ -70,6 +71,82 @@ class TemporaryTestCase(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.directory = Path(temporary.name)
+
+
+class BuildDriverTests(TemporaryTestCase):
+    def setUp(self):
+        super().setUp()
+        self.sources = [{"name": name, "version": "1.0"} for name in ("one", "two", "three")]
+        self.manifest = self.directory / "sources.json"
+        self.manifest.write_text(json.dumps({"schema": 1, "packages": self.sources}))
+        self.output = self.directory / "output"
+        self.argv = ["--manifest", str(self.manifest), "--target-prefix", str(self.directory / "target"),
+                     "--python-version", f"{sys.version_info.major}.{sys.version_info.minor}",
+                     "--cache", str(self.directory / "cache"), "--out", str(self.output)]
+        self.stages = []
+
+    def fake_build(self, source, prefix, version, api, cc, cache, output, readelf):
+        self.assertNotEqual(output, self.output)
+        self.assertEqual(list(self.output.iterdir()), [])
+        self.assertFalse((output / "parser-wheels.json").exists())
+        self.stages.append(output)
+        wheel = output / f"{source['name']}-1.0.whl"
+        wheel.write_bytes(b"built wheel")
+        return {"wheel": wheel.name, "source": source}
+
+    def test_nonempty_output_rejected_without_building_or_changing_stale_files(self):
+        self.output.mkdir()
+        for filename in ("stale.whl", "parser-wheels.json", ".hidden"):
+            with self.subTest(filename=filename):
+                stale = self.output / filename
+                stale.write_bytes(b"old output")
+                with mock.patch.object(wheels, "build_one") as build, mock.patch("sys.stderr", new=io.StringIO()):
+                    with self.assertRaises(SystemExit) as error:
+                        wheels.main(self.argv)
+                self.assertEqual(error.exception.code, 2)
+                build.assert_not_called()
+                self.assertEqual(stale.read_bytes(), b"old output")
+                self.assertEqual(list(self.output.iterdir()), [stale])
+                stale.unlink()
+
+    def test_failure_midbuild_leaves_empty_output_and_cleans_private_stage(self):
+        def fail_second(*args):
+            result = self.fake_build(*args)
+            if len(self.stages) == 2:
+                raise RuntimeError("second build failed")
+            return result
+
+        with mock.patch.object(wheels, "build_one", side_effect=fail_second) as build:
+            with self.assertRaisesRegex(RuntimeError, "second build failed"):
+                wheels.main(self.argv)
+        self.assertEqual(build.call_count, 2)
+        self.assertEqual(list(self.output.iterdir()), [])
+        self.assertTrue(all(not stage.exists() for stage in self.stages))
+
+    def test_success_publishes_all_wheels_and_writes_manifest_once(self):
+        self.output.mkdir()  # An existing empty destination is supported too.
+        write_text = Path.write_text
+        with mock.patch.object(wheels, "build_one", side_effect=self.fake_build) as build, mock.patch.object(
+            Path, "write_text", autospec=True, side_effect=write_text
+        ) as write:
+            self.assertEqual(wheels.main(self.argv), 0)
+        self.assertEqual(build.call_count, len(self.sources))
+        write.assert_called_once()
+        self.assertEqual(write.call_args.args[0], self.stages[0] / "parser-wheels.json")
+        report = json.loads((self.output / "parser-wheels.json").read_text())
+        self.assertEqual([item["source"] for item in report["wheels"]], self.sources)
+        self.assertEqual({p.name for p in self.output.iterdir()},
+                         {"parser-wheels.json", "one-1.0.whl", "two-1.0.whl", "three-1.0.whl"})
+        self.assertTrue(all(not stage.exists() for stage in self.stages))
+
+    def test_publication_failure_leaves_no_partial_output(self):
+        with mock.patch.object(wheels, "build_one", side_effect=self.fake_build), mock.patch.object(
+            wheels.os, "replace", side_effect=OSError("publication failed")
+        ):
+            with self.assertRaisesRegex(OSError, "publication failed"):
+                wheels.main(self.argv)
+        self.assertEqual(list(self.output.iterdir()), [])
+        self.assertTrue(all(not stage.exists() for stage in self.stages))
 
 
 class FetchTests(TemporaryTestCase):
