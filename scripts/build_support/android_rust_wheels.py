@@ -124,7 +124,10 @@ def build_one(source: dict, prefix: Path, version: str, api: int, cc: str,
     """Build one real upstream module; all outputs go to the private batch stage."""
     external_lock = verified_lock(source, manifest_dir)
     archive = fetch_source(source, cache)
-    with tempfile.TemporaryDirectory(prefix=".rust-build-", dir=output.parent) as temporary:
+    # Only the final batch stage must share the output filesystem. Extracting a
+    # standalone crate below the repository would make Cargo inherit OpenViking's
+    # parent workspace; use the process temp root for isolated source builds.
+    with tempfile.TemporaryDirectory(prefix="android-rust-build-") as temporary:
         directory = Path(temporary)
         project = unpack_source(archive, directory / "source")
         patches = patch_source(project, source)
