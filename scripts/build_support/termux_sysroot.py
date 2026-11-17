@@ -89,8 +89,14 @@ def parse_packages(text: str) -> list[dict[str, str]]:
     return stanzas
 
 
-def resolve_package(repo: str, arch: str, package: str) -> dict[str, str]:
-    """Return the ``Packages`` stanza for ``package`` in the given Termux arch."""
+def resolve_package(
+    repo: str, arch: str, package: str, version_prefix: str = ""
+) -> dict[str, str]:
+    """Return the ``Packages`` stanza for ``package`` in the given Termux arch.
+
+    ``version_prefix`` pins a CPython minor version (e.g. ``3.13``) when the
+    artifacts have to match a device that has not upgraded yet.
+    """
     index_root = f"{repo.rstrip('/')}/dists/stable/main/binary-{arch}"
     errors: list[str] = []
     for candidate in INDEX_CANDIDATES:
@@ -101,8 +107,11 @@ def resolve_package(repo: str, arch: str, package: str) -> dict[str, str]:
             errors.append(str(exc))
             continue
         for stanza in parse_packages(_decompress(candidate, payload).decode("utf-8", "replace")):
-            if stanza.get("Package") == package:
-                return stanza
+            if stanza.get("Package") != package:
+                continue
+            if version_prefix and not stanza.get("Version", "").startswith(version_prefix):
+                continue
+            return stanza
         errors.append(f"{url} has no '{package}' stanza")
     raise RuntimeError("; ".join(errors) or f"no Packages index under {index_root}")
 
@@ -222,10 +231,11 @@ def materialize(
     package: str = DEFAULT_PACKAGE,
     dest: Path,
     reuse: bool = True,
+    version_prefix: str = "",
 ) -> dict[str, str]:
     """Download + extract the Termux ``package`` and describe the CPython prefix."""
     dest = dest.resolve()
-    stanza = resolve_package(repo, arch, package)
+    stanza = resolve_package(repo, arch, package, version_prefix)
     deb = download_package(stanza, repo, dest / "_downloads")
     extract_root = dest / "root"
     prefix = find_prefix(extract_root) if reuse and extract_root.is_dir() else None
@@ -235,6 +245,11 @@ def materialize(
         extract_deb(deb, extract_root)
         prefix = find_prefix(extract_root)
     env = describe_python(prefix)
+    if version_prefix and not env["TERMUX_PY_VERSION"].startswith(version_prefix):
+        raise RuntimeError(
+            f"resolved CPython {env['TERMUX_PY_VERSION']} does not match the requested "
+            f"{version_prefix}"
+        )
     env["TERMUX_PACKAGE"] = f"{package}={stanza.get('Version', 'unknown')}"
     env["TERMUX_DEB"] = str(deb)
     return env
@@ -252,6 +267,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", default=os.environ.get("TERMUX_REPO", DEFAULT_REPO))
     parser.add_argument("--arch", default=DEFAULT_ARCH)
     parser.add_argument("--package", default=DEFAULT_PACKAGE)
+    parser.add_argument(
+        "--python-version",
+        default=os.environ.get("TERMUX_PY_VERSION_PIN", ""),
+        help="pin the CPython minor version, e.g. 3.13 (default: newest in the repo)",
+    )
     parser.add_argument("--write-env", type=Path, help="write KEY=VALUE lines to this file")
     parser.add_argument("--no-reuse", action="store_true", help="re-extract the deb every run")
     args = parser.parse_args(argv)
@@ -262,6 +282,7 @@ def main(argv: list[str] | None = None) -> int:
         package=args.package,
         dest=args.dest,
         reuse=not args.no_reuse,
+        version_prefix=args.python_version,
     )
     for key, value in env.items():
         print(f"{key}={value}")
