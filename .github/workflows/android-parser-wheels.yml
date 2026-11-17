@@ -1,0 +1,96 @@
+name: Android Parser Wheels
+
+# Dependency-wheel stage only. The language-pack Rust process() implementation
+# and the rest of the application dependency closure are separate release gates.
+on:
+  workflow_dispatch:
+    inputs:
+      android_api_level:
+        description: Minimum Android API (>=24)
+        default: '24'
+      termux_repo:
+        description: Termux repository providing target Python headers and libpython
+        default: https://packages.termux.dev/apt/termux-main
+  workflow_call:
+    inputs:
+      android_api_level:
+        type: string
+        default: '24'
+      termux_repo:
+        type: string
+        default: https://packages.termux.dev/apt/termux-main
+
+permissions:
+  contents: read
+
+jobs:
+  parsers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ANDROID_API_LEVEL: ${{ inputs.android_api_level || '24' }}
+      TERMUX_REPO: ${{ inputs.termux_repo || 'https://packages.termux.dev/apt/termux-main' }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test parser build helpers
+        run: python3 -m unittest discover -s tests/misc -p test_android_parser_wheels.py -v
+      - uses: astral-sh/setup-uv@v7
+      - name: Extract target Termux Python
+        run: |
+          set -euo pipefail
+          python3 scripts/build_support/termux_sysroot.py \
+            --dest "$RUNNER_TEMP/termux-sysroot" --repo "$TERMUX_REPO" \
+            --write-env "$RUNNER_TEMP/termux-python.env"
+          cat "$RUNNER_TEMP/termux-python.env" >> "$GITHUB_ENV"
+      - name: Set up matching build Python and NDK
+        run: |
+          set -euo pipefail
+          uv python install "$TERMUX_PY_VERSION"
+          uv venv --python "$TERMUX_PY_VERSION" "$RUNNER_TEMP/parser-build"
+          uv pip install --python "$RUNNER_TEMP/parser-build/bin/python" \
+            'setuptools==84.2.1' 'wheel==0.48.0' 'build==1.6.1'
+          ndk="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-${ANDROID_NDK:-}}}"
+          test -d "$ndk"
+          ndk_bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$ndk_bin/aarch64-linux-android${ANDROID_API_LEVEL}-clang"
+          {
+            echo "NDK_BIN=$ndk_bin"
+            echo "NDK_VERSION=$(basename "$ndk")"
+          } >> "$GITHUB_ENV"
+      - name: Build and inspect all pinned parser wheels
+        run: |
+          set -euo pipefail
+          export AR="$NDK_BIN/llvm-ar"
+          "$RUNNER_TEMP/parser-build/bin/python" scripts/build_support/android_parser_wheels.py \
+            --target-prefix "$TERMUX_PREFIX" --python-version "$TERMUX_PY_VERSION" \
+            --android-api "$ANDROID_API_LEVEL" \
+            --cc "$NDK_BIN/aarch64-linux-android${ANDROID_API_LEVEL}-clang" \
+            --readelf "$NDK_BIN/llvm-readelf" \
+            --cache "$RUNNER_TEMP/parser-sources" --out dist-android-parsers
+      - name: Include provenance and device smoke test
+        run: |
+          set -euo pipefail
+          cp scripts/build_support/android_parser_sources.json dist-android-parsers/source-manifest.json
+          cp scripts/build_support/android_parser_smoke.py dist-android-parsers/
+          cp docs/en/guides/android-distribution.md dist-android-parsers/README.md
+          (cd dist-android-parsers && sha256sum *.whl > SHA256SUMS)
+          {
+            echo "### Android standalone parser dependency wheels"
+            echo "- Termux Python $TERMUX_PY_VERSION; Android API $ANDROID_API_LEVEL"
+            echo "- NDK $NDK_VERSION"
+            echo '- Exact CPython-minor tags, target sysconfig, libpython and ELF checks'
+            echo '- Device-side parsing tests are required; cross-compilation is not a runtime test.'
+            echo '- This is not the complete OpenViking dependency wheelhouse.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openviking-android-parser-wheels
+          path: dist-android-parsers/
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openviking-android-parser-sources
+          path: ${{ runner.temp }}/parser-sources/
+          if-no-files-found: error
+          retention-days: 30
