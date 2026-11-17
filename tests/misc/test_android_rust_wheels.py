@@ -607,6 +607,57 @@ class BuildContractTests(OfflineCase):
         self.assertEqual((out / result["cargo_lock"]["file"]).read_bytes(), original)
         self.assertEqual(result["source_sha256"], digest(archive.read_bytes()))
 
+    def test_source_build_uses_process_temp_root_not_output_parent_workspace(self):
+        project, archive, out = self.project()
+        real_temporary_directory = tempfile.TemporaryDirectory
+        extracted = []
+
+        def unpack(archive_path, destination):
+            self.assertEqual(archive_path, archive)
+            # A standalone crate must not inherit the checkout's Cargo workspace.
+            self.assertFalse(destination.resolve().is_relative_to(out.parent.resolve()))
+            self.assertEqual(
+                destination.parent.parent.resolve(), Path(tempfile.gettempdir()).resolve()
+            )
+            destination.mkdir()
+            for name in ("Cargo.toml", "Cargo.lock"):
+                (destination / name).write_bytes((project / name).read_bytes())
+            extracted.append(destination)
+            return destination
+
+        def run(command, **kwargs):
+            if "maturin" in command:
+                self.assertEqual(kwargs["cwd"], extracted[0])
+                wheels = Path(command[command.index("--out") + 1])
+                self.assertEqual(wheels.parent, extracted[0].parent)
+                wheels.mkdir()
+                metadata_wheel(wheels / "demo-1.0-py3-none-any.whl")
+
+        with (
+            mock.patch.object(
+                rust.tempfile, "TemporaryDirectory", wraps=real_temporary_directory
+            ) as temporary,
+            mock.patch.object(rust, "fetch_source", return_value=archive),
+            mock.patch.object(rust, "unpack_source", side_effect=unpack),
+            mock.patch.object(rust, "build_environment", return_value={}),
+            mock.patch.object(rust.subprocess, "run", side_effect=run),
+            mock.patch.object(rust.subprocess, "check_output", return_value="rustc fixture\n"),
+            mock.patch.object(rust, "include_notices", return_value={"fixture": True}),
+            mock.patch.object(
+                rust, "inspect_wheel", return_value={"wheel": "demo-1.0-py3-none-any.whl"}
+            ),
+        ):
+            rust.build_one(
+                source(), self.root, HOST_MINOR, 24, "clang", self.root, out, "readelf", self.root
+            )
+        temporary.assert_called_once()
+        self.assertEqual(temporary.call_args.args, ())
+        self.assertNotIn("dir", temporary.call_args.kwargs)
+        self.assertEqual(temporary.call_args.kwargs["prefix"], "android-rust-build-")
+        self.assertEqual(len(extracted), 1)
+        self.assertFalse(extracted[0].exists(), "source build directory must be cleaned up")
+        self.assertTrue((out / "demo-1.0-py3-none-any.whl").is_file())
+
     def test_original_sdist_lock_is_validated_before_override_copy_or_build(self):
         project, archive, out = self.project()
         original = (project / "Cargo.lock").read_bytes()

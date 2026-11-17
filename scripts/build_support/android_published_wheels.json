@@ -1,0 +1,2443 @@
+{
+  "schema": 1,
+  "python_minor": "3.14",
+  "android_api": 24,
+  "architecture": "aarch64",
+  "constraints_sha256": "2734733e24668df4fee9b473bcffc79ed6b7afce28845bd67132d7276856192c",
+  "wheels": [
+    {
+      "name": "aiodns",
+      "version": "4.0.4",
+      "filename": "aiodns-4.0.4-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7f/70/72e4ab117425ccdc4d10bd523a94c1baa051a15586057d64a4c6888f9e3f/aiodns-4.0.4-py3-none-any.whl",
+      "sha256": "c24dd605bac70a1676ce503f967a98483ff163507198557d8e9db16267e6cfd2",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "aioftp",
+      "version": "0.28.3",
+      "filename": "aioftp-0.28.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/3c/f0/a0d7a27907e2a825ee14ced143122eb3feff0f4b697f5ec76695dbb92dd2/aioftp-0.28.3-py3-none-any.whl",
+      "sha256": "1d40f1a790efa614df1ffbd3ea68d6cebf8ce89ef544f234801d7e8950445638",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "aiohappyeyeballs",
+      "version": "2.7.1",
+      "filename": "aiohappyeyeballs-2.7.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/71/43/1947f06babed6b3f1d7f38b0c767f52df66bfb2bc10b468c4a7de9eceff2/aiohappyeyeballs-2.7.1-py3-none-any.whl",
+      "sha256": "9243213661e29250eb41368e5daa826fc017156c3b8a11440826b2e3ed376472",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "aiohttp",
+      "version": "3.14.5",
+      "filename": "aiohttp-3.14.5-cp314-cp314-android_24_arm64_v8a.whl",
+      "url": "https://files.pythonhosted.org/packages/43/be/3184a1d34a8be665569eadb7e9e764b4629e4f3413e241cb2e4d6fecf3b3/aiohttp-3.14.5-cp314-cp314-android_24_arm64_v8a.whl",
+      "sha256": "939042d5cda21d41a6f512e7cc8b8e33a2aebff863352251da495fbd91b673b5",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "aiosignal",
+      "version": "1.4.0",
+      "filename": "aiosignal-1.4.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/fb/76/641ae371508676492379f16e2fa48f4e2c11741bd63c48be4b12a6b09cba/aiosignal-1.4.0-py3-none-any.whl",
+      "sha256": "053243f8b92b990551949e63930a839ff0cf0b0ebbe0597b0f3fb19e1a0fe82e",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "annotated-doc",
+      "version": "0.0.6",
+      "filename": "annotated_doc-0.0.6-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/cd/f5/3dd85d583e55be76cd02b1fc9bbec771b12d63124b01661d9535ccf8721f/annotated_doc-0.0.6-py3-none-any.whl",
+      "sha256": "361ca0950cc7082f53fa69e9328409f40a62c61e57e0a47e1825a08078a58a53",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "annotated-types",
+      "version": "0.8.0",
+      "filename": "annotated_types-0.8.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl",
+      "sha256": "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "anyio",
+      "version": "4.16.0",
+      "filename": "anyio-4.16.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a9/16/7757fb84c819accc7d7e9af5291b261e4abb8627ee040f99e7d35ef2457a/anyio-4.16.0-py3-none-any.whl",
+      "sha256": "c66ae634e0b8228396b801741beb3294326d4b6102f7bba4041c0dfb58c29026",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "apscheduler",
+      "version": "3.11.3",
+      "filename": "apscheduler-3.11.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/42/c9/8638db32514dbb9157b3d82680c6faea89283523edf9ed2415ea3884f2ae/apscheduler-3.11.3-py3-none-any.whl",
+      "sha256": "bbeb2ec02d23d3c06a6c07ed7f0f3939ada6680eb121fae809a69bb42c537a30",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "argon2-cffi",
+      "version": "25.1.0",
+      "filename": "argon2_cffi-25.1.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/4f/d3/a8b22fa575b297cd6e3e3b0155c7e25db170edf1c74783d6a31a2490b8d9/argon2_cffi-25.1.0-py3-none-any.whl",
+      "sha256": "fdc8b074db390fccb6eb4a3604ae7231f219aa669a2652e0f20e16ba513d5741",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "async-timeout",
+      "version": "5.0.1",
+      "filename": "async_timeout-5.0.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/fe/ba/e2081de779ca30d473f21f5b30e0e737c438205440784c7dfc81efc2b029/async_timeout-5.0.1-py3-none-any.whl",
+      "sha256": "39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "attrs",
+      "version": "26.1.0",
+      "filename": "attrs-26.1.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/64/b4/17d4b0b2a2dc85a6df63d1157e028ed19f90d4cd97c36717afef2bc2f395/attrs-26.1.0-py3-none-any.whl",
+      "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "automat",
+      "version": "25.4.16",
+      "filename": "automat-25.4.16-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/02/ff/1175b0b7371e46244032d43a56862d0af455823b5280a50c63d99cc50f18/automat-25.4.16-py3-none-any.whl",
+      "sha256": "04e9bce696a8d5671ee698005af6e5a9fa15354140a87f4870744604dcdd3ba1",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "beautifulsoup4",
+      "version": "4.15.0",
+      "filename": "beautifulsoup4-4.15.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/88/c6/92fcd42f1ba33e1184263f25bfabf3d27c383410470f169e4b8163bf9c17/beautifulsoup4-4.15.0-py3-none-any.whl",
+      "sha256": "d6f88de62e1d4e38ecb1077eb9724cd0eff29d2a08ca16a401e9b9e93f117cf9",
+      "requires_python": ">=3.7.0"
+    },
+    {
+      "name": "boto3",
+      "version": "1.44.3",
+      "filename": "boto3-1.44.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/9a/b5/2807516d854b60f430917590fcfe470bc60c5383cd6b27dc57aa6dc6afea/boto3-1.44.3-py3-none-any.whl",
+      "sha256": "8c9c4844c7ce184494b102983696d6cdb09f5307ec7f238ca4ad5849fb14e26b",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "botocore",
+      "version": "1.44.3",
+      "filename": "botocore-1.44.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/20/65/e39cc0e0d16cf9efe0afab0edef48b89491b548e2c7d7ddc23bbb2c6422c/botocore-1.44.3-py3-none-any.whl",
+      "sha256": "793eac2a7ca167e9376b136cf000e1675e9ffe8d7ec609160cc1ee00b93ace28",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "cairocffi",
+      "version": "1.7.1",
+      "filename": "cairocffi-1.7.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/93/d8/ba13451aa6b745c49536e87b6bf8f629b950e84bd0e8308f7dc6883b67e2/cairocffi-1.7.1-py3-none-any.whl",
+      "sha256": "9803a0e11f6c962f3b0ae2ec8ba6ae45e957a146a004697a1ac1bbf16b073b3f",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "cairosvg",
+      "version": "2.9.1",
+      "filename": "cairosvg-2.9.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/41/51/8041c2e70649e5b7f2a0aedbbbd0609ac099cfaa0cbde2014279c9c05756/cairosvg-2.9.1-py3-none-any.whl",
+      "sha256": "f91c5628e834be024a0ed4544d76261cd84016a4c73bcdf26c386495825c05a1",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "certifi",
+      "version": "2026.10.23",
+      "filename": "certifi-2026.10.23-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl",
+      "sha256": "e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1",
+      "requires_python": ">=3.7"
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.5.2",
+      "filename": "charset_normalizer-3.5.2-cp314-cp314-android_24_arm64_v8a.whl",
+      "url": "https://files.pythonhosted.org/packages/58/ca/7aa91362a2f77ac8e9e28a9b902a74f7d0e11a851ef0d27a74308da8cd90/charset_normalizer-3.5.2-cp314-cp314-android_24_arm64_v8a.whl",
+      "sha256": "1afb975bd5d68d5ce9f6b6d44fdf2f7e34b895a35e95708a7a91b20a3b51d187",
+      "requires_python": ">=3.7"
+    },
+    {
+      "name": "click",
+      "version": "8.5.1",
+      "filename": "click-8.5.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/31/7d/164b7ffc8624fe9efb4221bf9af485d5c1e41b9ae118045d2b6dc5457d8b/click-8.5.1-py3-none-any.whl",
+      "sha256": "8bb5376d2006950386f8c6427613334a2acadc5f559cb80e638d00b4df957e37",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "constantly",
+      "version": "23.10.4",
+      "filename": "constantly-23.10.4-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b8/40/c199d095151addf69efdb4b9ca3a4f20f70e20508d6222bffb9b76f58573/constantly-23.10.4-py3-none-any.whl",
+      "sha256": "3fd9b4d1c3dc1ec9757f3c52aef7e53ad9323dbe39f51dfd4c43853b68dfa3f9",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "courlan",
+      "version": "1.5.0",
+      "filename": "courlan-1.5.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/8b/59/4f564893812e0b1f2775437f43bb6b9d492e36c659dd3a1f52a29a0b189e/courlan-1.5.0-py3-none-any.whl",
+      "sha256": "a5b121409f864e6ddf39a026ebafabf59c64511d11b336ae30ad4034bbd42b77",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "cssselect2",
+      "version": "0.10.1",
+      "filename": "cssselect2-0.10.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/bd/59/6b1daa3b94de8970e2a2787ba73616c2d0675d2f948ef4cad8bef7f21bc6/cssselect2-0.10.1-py3-none-any.whl",
+      "sha256": "25cc4494d55985d6a6da359be48da6ce98c28dcbafa2314c383ace3fc32ec868",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "cssselect",
+      "version": "1.6.0",
+      "filename": "cssselect-1.6.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/08/ae/f24b3aac56ba91a29c9d3a31c07a9ad4e9eb500e5d212742bb6d348edaef/cssselect-1.6.0-py3-none-any.whl",
+      "sha256": "6df6eab9b264c0f2092a6e386b33610e1684a25e27925ecebe25e3d97cbf3525",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "dateparser",
+      "version": "1.5.0",
+      "filename": "dateparser-1.5.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7f/58/73739bc1e168f309aeb8cc29b5866a134da8dbd4f69af947fc93462f1e33/dateparser-1.5.0-py3-none-any.whl",
+      "sha256": "7c4e088f25458f57db391510035af0878439a6df71d159318dcdb0a7553932e3",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "decorator",
+      "version": "5.3.1",
+      "filename": "decorator-5.3.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/05/7f/798705f5296a58ca505d600456748d1be48078eac8a7050d8a98bc9edb89/decorator-5.3.1-py3-none-any.whl",
+      "sha256": "f47fe6fdbd2edd623ecfe36875d37aba411624e2670dd395dddae1358689bb3c",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "defusedxml",
+      "version": "0.7.1",
+      "filename": "defusedxml-0.7.1-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl",
+      "sha256": "a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61",
+      "requires_python": ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+    },
+    {
+      "name": "distro",
+      "version": "1.9.0",
+      "filename": "distro-1.9.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl",
+      "sha256": "7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2",
+      "requires_python": ">=3.6"
+    },
+    {
+      "name": "fastapi",
+      "version": "0.163.1",
+      "filename": "fastapi-0.163.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/20/b6/2424da1e40825d3fc54539621811f34e21472499677c9490e4967270e38e/fastapi-0.163.1-py3-none-any.whl",
+      "sha256": "68f2d8050f5c3583121c0d203046cc7def5c16a7d6c43a0e7707a8ea610fe2d3",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "feedparser-sgmllib",
+      "version": "2.1.0",
+      "filename": "feedparser_sgmllib-2.1.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/85/a0/79a31f898092e145bd66e2b338fb0656979acb2bbbcae8220940fbfcd820/feedparser_sgmllib-2.1.0-py3-none-any.whl",
+      "sha256": "2cab2d43b95a954f920f18aebce7a4dbbb3f539780b127e2aa114f579821e01d",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "feedparser",
+      "version": "6.0.14",
+      "filename": "feedparser-6.0.14-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7f/61/f04912e63702e73fb2a378f9c0a1ad9eb17a334a11a6b3fe1daa593903c2/feedparser-6.0.14-py3-none-any.whl",
+      "sha256": "e35e3f760151b0c3b22cac9684155cae186a233e16c49bcbc6c49e91e3131137",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "filelock",
+      "version": "4.2.10",
+      "filename": "filelock-4.2.10-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/ef/90/5d0096a325aa0f83ba7a3968bfb485b67e32c947bdf9cd0fcb4b485be718/filelock-4.2.10-py3-none-any.whl",
+      "sha256": "9479aaeb4db20b5a53e3da28493edd24720b66b8a0b84030aa56ccdf243d6857",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "formerly",
+      "version": "0.1.0",
+      "filename": "formerly-0.1.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/9c/21/99cb05c0928fce1bd1b22a873d7ac94847af789ca35a43e34e9c34ded0f4/formerly-0.1.0-py3-none-any.whl",
+      "sha256": "96dc14b85d8288eda824fa1f1521a1b070252fea9fb17d2bc7134c6661b7c556",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "frozenlist",
+      "version": "1.8.0",
+      "filename": "frozenlist-1.8.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/9a/9a/e35b4a917281c0b8419d4207f4334c8e8c5dbf4f3f5f9ada73958d937dcc/frozenlist-1.8.0-py3-none-any.whl",
+      "sha256": "0c18a16eab41e82c295618a77502e17b195883241c563b00f0aa5106fc4eaa0d",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "fsspec",
+      "version": "2026.9.0",
+      "filename": "fsspec-2026.9.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/6c/c0/a98505f18594f1bce828bb159cec0fcf9860562f1a2c85913409fc8f3d9e/fsspec-2026.9.0-py3-none-any.whl",
+      "sha256": "8dd6e646e99ea382bd85f97a45e6b526a442d79423a7dc673f1e2756d05fcb5f",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "google",
+      "version": "3.0.0",
+      "filename": "google-3.0.0-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/ac/35/17c9141c4ae21e9a29a43acdfd848e3e468a810517f862cad07977bf8fe9/google-3.0.0-py2.py3-none-any.whl",
+      "sha256": "889cf695f84e4ae2c55fbc0cfdaf4c1e729417fa52ab1db0485202ba173e4935",
+      "requires_python": ""
+    },
+    {
+      "name": "googleapis-common-protos",
+      "version": "1.76.0",
+      "filename": "googleapis_common_protos-1.76.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/05/6d/78dc67a9e779e594b49bf62604034d3a6aa428a55afc729cafda4b7333e1/googleapis_common_protos-1.76.0-py3-none-any.whl",
+      "sha256": "59e13344a9f3651aa201a03e2bee815a3bf43a4baf1f9ff8a9b62a840ce25fac",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "grep-ast",
+      "version": "0.9.0",
+      "filename": "grep_ast-0.9.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/40/79/29f1373b2ce1eec37c03aefbc17194c2470d8b61ede288e5043231825999/grep_ast-0.9.0-py3-none-any.whl",
+      "sha256": "a3973dca99f1abc026a01bbbc70e00a63860c8ff94a56182ff18b089836826d7",
+      "requires_python": ""
+    },
+    {
+      "name": "h11",
+      "version": "0.16.0",
+      "filename": "h11-0.16.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl",
+      "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "h2",
+      "version": "4.4.1",
+      "filename": "h2-4.4.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7e/22/e85faf23bd72a92d1921e37d674ca56eb298a3c8be31fdecef0ff2b3aaac/h2-4.4.1-py3-none-any.whl",
+      "sha256": "0e25f1462b23c9cb82d9eb02e28bc706dac2a68cb457c6a0d74d63c8a2a5d0e6",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "hpack",
+      "version": "4.2.0",
+      "filename": "hpack-4.2.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/71/b4/4a9fcfb2aef6ba44d9073ecd301443aa00b3dac95de5619f2a7de7ec8a91/hpack-4.2.0-py3-none-any.whl",
+      "sha256": "858ac0b02280fa582b5080d68db0899c62a80375e0e5413a74970c5e518b6986",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "htmldate",
+      "version": "1.11.0",
+      "filename": "htmldate-1.11.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/42/f8/6139fc95b889f44e9a4b373778f10315ade81b395a6298adf3c08415de64/htmldate-1.11.0-py3-none-any.whl",
+      "sha256": "2a5a0d80cce38d3f986a64bb9ab64ba03e5953159b38fd78a841492131ead348",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "httpcore2",
+      "version": "2.16.2",
+      "filename": "httpcore2-2.16.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/2a/e8/009c347feac27f8960605aa98d55ed263b5870dd4fd80b82fd1d00d5716c/httpcore2-2.16.2-py3-none-any.whl",
+      "sha256": "16051ae2a42f776007543f32de9349a317b23d2cbb4e1456b4bac0e88b87419a",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "httpcore",
+      "version": "1.0.9",
+      "filename": "httpcore-1.0.9-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl",
+      "sha256": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "httpx-sse",
+      "version": "0.4.3",
+      "filename": "httpx_sse-0.4.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d2/fd/6668e5aec43ab844de6fc74927e155a3b37bf40d7c3790e49fc0406b6578/httpx_sse-0.4.3-py3-none-any.whl",
+      "sha256": "0ac1c9fe3c0afad2e0ebb25a934a59f4c7823b60792691f779fad2c5568830fc",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "httpx2",
+      "version": "2.16.2",
+      "filename": "httpx2-2.16.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/77/de/8c4306a3d6aa2495111986addf33a9e561eff4c47552e4c4b9251160d0ad/httpx2-2.16.2-py3-none-any.whl",
+      "sha256": "f05c13aade4c45dbf1c9060647a1058f0acad62398fad96e741269edb33d46f5",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "httpx",
+      "version": "0.28.1",
+      "filename": "httpx-0.28.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl",
+      "sha256": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "huggingface-hub",
+      "version": "2.4.0",
+      "filename": "huggingface_hub-2.4.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d4/55/ff47f1b082ecf5f43f4bc1e3b932d68eead171dabbbd1a92666c686301d7/huggingface_hub-2.4.0-py3-none-any.whl",
+      "sha256": "42ecfd93ede47bdd333daebbf66a32d7bfe2e18752754fe4d2d4f98a0179d801",
+      "requires_python": ">=3.10.0"
+    },
+    {
+      "name": "hyperframe",
+      "version": "6.1.0",
+      "filename": "hyperframe-6.1.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/48/30/47d0bf6072f7252e6521f3447ccfa40b421b6824517f82854703d0f5a98b/hyperframe-6.1.0-py3-none-any.whl",
+      "sha256": "b03380493a519fce58ea5af42e4a42317bf9bd425596f7a0835ffce80f1a42e5",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "hyperlink",
+      "version": "21.0.0",
+      "filename": "hyperlink-21.0.0-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/6e/aa/8caf6a0a3e62863cbb9dab27135660acba46903b703e224f14f447e57934/hyperlink-21.0.0-py2.py3-none-any.whl",
+      "sha256": "e6b14c37ecb73e89c77d78cdb4c2cc8f3fb59a885c5b3f819ff4ed80f25af1b4",
+      "requires_python": ""
+    },
+    {
+      "name": "idna",
+      "version": "3.20",
+      "filename": "idna-3.20-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl",
+      "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "importlib-metadata",
+      "version": "8.9.0",
+      "filename": "importlib_metadata-8.9.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7d/f9/97f2ca8bb3ec6e4b1d64f983ebe98b9a192faddff67fac3d6303a537e670/importlib_metadata-8.9.0-py3-none-any.whl",
+      "sha256": "e0f761b6ea91ced3b0844c14c9d955224d538105921f8e6754c00f6ca79fba7f",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "incremental",
+      "version": "24.11.0",
+      "filename": "incremental-24.11.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/1d/55/0f4df2a44053867ea9cbea73fc588b03c55605cd695cee0a3d86f0029cb2/incremental-24.11.0-py3-none-any.whl",
+      "sha256": "a34450716b1c4341fe6676a0598e88a39e04189f4dce5dc96f656e040baa10b3",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "itemadapter",
+      "version": "0.14.0",
+      "filename": "itemadapter-0.14.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/65/4b/022994816dceb15b70df2b588a48adec8c03e6f14afb14ad2ab89f90f32c/itemadapter-0.14.0-py3-none-any.whl",
+      "sha256": "ae3954d56143a8aeb1e637e00dfb8ff46dfd1dd214f76d138e5520fcf293ed00",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "itemloaders",
+      "version": "1.5.0",
+      "filename": "itemloaders-1.5.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7e/ad/44f03332459d62d921e62b76b4bd699382ee5e7aa29b7d9fc7be934a8341/itemloaders-1.5.0-py3-none-any.whl",
+      "sha256": "d57a4e5b204a1f88affdc6e03ed2f4f60ad7f3b7cc90f5914af92c9b52e46efb",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "jinja2",
+      "version": "3.1.6",
+      "filename": "jinja2-3.1.6-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl",
+      "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+      "requires_python": ">=3.7"
+    },
+    {
+      "name": "jmespath",
+      "version": "1.1.0",
+      "filename": "jmespath-1.1.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/14/2f/967ba146e6d58cf6a652da73885f52fc68001525b4197effc174321d70b4/jmespath-1.1.0-py3-none-any.whl",
+      "sha256": "a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "json-repair",
+      "version": "0.64.9",
+      "filename": "json_repair-0.64.9-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/40/1c/b38f71c1b4e859e10568336d8fbb271170150033c3a9d02b3e126b500828/json_repair-0.64.9-py3-none-any.whl",
+      "sha256": "531c7d429db82731f3c9811157c025599a2ef620823c56d9143bab0b5ad97930",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "jsonschema-specifications",
+      "version": "2025.9.1",
+      "filename": "jsonschema_specifications-2025.9.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/41/45/1a4ed80516f02155c51f51e8cedb3c1902296743db0bbc66608a0db2814f/jsonschema_specifications-2025.9.1-py3-none-any.whl",
+      "sha256": "98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "jsonschema",
+      "version": "4.26.0",
+      "filename": "jsonschema-4.26.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/69/90/f63fb5873511e014207a475e2bb4e8b2e570d655b00ac19a9a0ca0a385ee/jsonschema-4.26.0-py3-none-any.whl",
+      "sha256": "d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "justext",
+      "version": "3.0.2",
+      "filename": "justext-3.0.2-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f2/ac/52f4e86d1924a7fc05af3aeb34488570eccc39b4af90530dd6acecdf16b5/justext-3.0.2-py2.py3-none-any.whl",
+      "sha256": "62b1c562b15c3c6265e121cc070874243a443bfd53060e869393f09d6b6cc9a7",
+      "requires_python": ""
+    },
+    {
+      "name": "lark-oapi",
+      "version": "1.8.0",
+      "filename": "lark_oapi-1.8.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/51/6b/20e31de896e030bdde8abd1bf785400278fe5d0c247048ace2ce0b2a9f66/lark_oapi-1.8.0-py3-none-any.whl",
+      "sha256": "a83db234a4be7fcead8f4d521bc2d0602eb37a7b64adfe019bd4a75135331cd8",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "loguru",
+      "version": "0.8.0",
+      "filename": "loguru-0.8.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c8/00/9ee7c8da7342b1a5524bca9d036f89e7d1d1e5a6345c9623763eeeac941f/loguru-0.8.0-py3-none-any.whl",
+      "sha256": "e0fba09d6f76ba2d2f4bd1757122942f5a670c702e988b5efaeab99dacba0069",
+      "requires_python": ">=3.5"
+    },
+    {
+      "name": "lxml-html-clean",
+      "version": "0.4.6",
+      "filename": "lxml_html_clean-0.4.6-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f5/36/4898b5e3951635846ed0e445e042fadf02b7c5e811a9e43da5b3557bc8d2/lxml_html_clean-0.4.6-py3-none-any.whl",
+      "sha256": "cc037270ba500a65e7235409dcddcae8ef37300f26dea826b61d917bf0236880",
+      "requires_python": ""
+    },
+    {
+      "name": "markdown-it-py",
+      "version": "4.3.0",
+      "filename": "markdown_it_py-4.3.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c9/31/5f0ac2f1a1c67423c995c731a11cd4ad05d081a2be969d74f868bdb9cc70/markdown_it_py-4.3.0-py3-none-any.whl",
+      "sha256": "7aa1511a46c39138de78d9eba92ce47e63124d8003fc98b3a351909e04239efa",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "markupsafe",
+      "version": "3.0.4",
+      "filename": "markupsafe-3.0.4-cp314-cp314-android_24_arm64_v8a.whl",
+      "url": "https://files.pythonhosted.org/packages/5c/c3/a944f3b0df22bd129e96915b9f4e98d2eeca6516687d7618304a966c3c74/markupsafe-3.0.4-cp314-cp314-android_24_arm64_v8a.whl",
+      "sha256": "4ed644d75aa94a2baf7ec3a96eaa160ea58c742eb9d27c6506053c5c40fc84ed",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "mcp",
+      "version": "1.30.0",
+      "filename": "mcp-1.30.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f5/f4/e58bc33317c92a0203664daaf00bf6f41166cc0149e5d6870a03f7cd004a/mcp-1.30.0-py3-none-any.whl",
+      "sha256": "666edb5009503e1047c9d60346a756f94b261f05cc2625f23d41c728ffc484d0",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "mdurl",
+      "version": "0.1.2",
+      "filename": "mdurl-0.1.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl",
+      "sha256": "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8",
+      "requires_python": ">=3.7"
+    },
+    {
+      "name": "multidict",
+      "version": "7.2.1",
+      "filename": "multidict-7.2.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/9d/96/1aaad0e5df33f1f5af21775c411349c0234a6edd581ea403bc81919a6eab/multidict-7.2.1-py3-none-any.whl",
+      "sha256": "08ea94663d9e7c25d14d78222f7aee906c472d4837766bec62477c38f6e419dc",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "openai",
+      "version": "2.54.0",
+      "filename": "openai-2.54.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/64/a8/bb76c7356de8ad57f59d5ff993d434df0607f07f08bcc9c9a5c275e399c0/openai-2.54.0-py3-none-any.whl",
+      "sha256": "89089789197ccdb87f173a03145ed1598d00795220c93e96cf712b1cbf5e5f2b",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "opentelemetry-api",
+      "version": "1.45.2",
+      "filename": "opentelemetry_api-1.45.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a9/2d/610db864d7513158cebb8f36cc88e67e73bd6c7aa1905ef18d89e1281c81/opentelemetry_api-1.45.2-py3-none-any.whl",
+      "sha256": "2cbd737377e710ee740d261c94e93fa0f08e6d037c18f17513cc0a2d94479a34",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "opentelemetry-exporter-http-transport",
+      "version": "0.66b2",
+      "filename": "opentelemetry_exporter_http_transport-0.66b2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a1/b2/c622a101f31c0e6670b82f4264c4e77c161bce415bc6fc158fda0b82e218/opentelemetry_exporter_http_transport-0.66b2-py3-none-any.whl",
+      "sha256": "fd5f5b490c099acda1cd7b909d5e8981436bf18cc8c6098d302d114c271720e9",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "opentelemetry-exporter-otlp-common",
+      "version": "0.66b2",
+      "filename": "opentelemetry_exporter_otlp_common-0.66b2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a8/47/b3049e30b339c82e3c7ec1fc692185a5d5a3ba65a94c570bb39b2c0b8424/opentelemetry_exporter_otlp_common-0.66b2-py3-none-any.whl",
+      "sha256": "ace86efb75489f925f1ef809856ae5f0c7db534e4afdc624530222228b1236a5",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "opentelemetry-exporter-otlp-proto-common",
+      "version": "1.45.2",
+      "filename": "opentelemetry_exporter_otlp_proto_common-1.45.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e6/d6/0f30d38120a949aef70528f845bf539f80df62abb4b8e62fdf69c2b6df5a/opentelemetry_exporter_otlp_proto_common-1.45.2-py3-none-any.whl",
+      "sha256": "af483b24217028892f017096731b794b196b785025d2e6808874720fd0b05a80",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "opentelemetry-exporter-otlp-proto-grpc",
+      "version": "1.45.2",
+      "filename": "opentelemetry_exporter_otlp_proto_grpc-1.45.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e8/48/14301cac3d106e795eef7e89e191489f086b4e5ad26e47c9635a198e95f4/opentelemetry_exporter_otlp_proto_grpc-1.45.2-py3-none-any.whl",
+      "sha256": "8a48d60835e90536846bd82de487bfbd81bccb5a1b3d0fb82edeea17db07395c",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "opentelemetry-exporter-otlp-proto-http",
+      "version": "1.45.2",
+      "filename": "opentelemetry_exporter_otlp_proto_http-1.45.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/32/65/f64d7d2450217e2989714e1dee15e19bf79a77a313387abac0cac77bc10e/opentelemetry_exporter_otlp_proto_http-1.45.2-py3-none-any.whl",
+      "sha256": "6e4d025138829d0ee57946930c2ccad6491ad4d92a958e9c7eea69278fe60cfc",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "opentelemetry-instrumentation-asyncio",
+      "version": "0.66b2",
+      "filename": "opentelemetry_instrumentation_asyncio-0.66b2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/13/7c/040b650db668f7df2d21ca731c1542c232e69173eed4faa1cd2f89a3bb7b/opentelemetry_instrumentation_asyncio-0.66b2-py3-none-any.whl",
+      "sha256": "8bd83268754604b42ac807acfde11a5d00348fed7b550df3140ffa4496a74147",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "opentelemetry-instrumentation",
+      "version": "0.66b2",
+      "filename": "opentelemetry_instrumentation-0.66b2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/3b/41/014d40e2b08a5d9d9058ed4967ad992657c203ce0c292ded97364ee7b82a/opentelemetry_instrumentation-0.66b2-py3-none-any.whl",
+      "sha256": "fa9ccfdab147a14af8107d19ef0a7b5015675273c5adced7a1fc38f28b42ec4c",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "opentelemetry-proto",
+      "version": "1.45.2",
+      "filename": "opentelemetry_proto-1.45.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7e/0d/a0b8f2b9efe2ec1abdf639d3696db9b1563ebeb11d91aac08ba7341e9122/opentelemetry_proto-1.45.2-py3-none-any.whl",
+      "sha256": "03a7ca1b43f89fd5b965d5975902bb2515c0c86e2428b456836e9a6149c6235a",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "opentelemetry-sdk",
+      "version": "1.45.2",
+      "filename": "opentelemetry_sdk-1.45.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/9f/a5/9a3b793ef48245f2336a16beb2324c2397dbb3f987cd68942f77cca06156/opentelemetry_sdk-1.45.2-py3-none-any.whl",
+      "sha256": "ff974ea70ee4f1d51e2ec152db37c2b626c7bf82bb3f7d86114fd8704e7199c6",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "opentelemetry-semantic-conventions",
+      "version": "0.66b2",
+      "filename": "opentelemetry_semantic_conventions-0.66b2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/67/bd/6bf33ed31521c565931c037e9e81bac47c1acb000e850c6e24220e2a0c00/opentelemetry_semantic_conventions-0.66b2-py3-none-any.whl",
+      "sha256": "4cbe61e5f9275d57ab31708446e7938ef4291ebbe6a7fca6f7a629c5acae87d8",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "openviking-sdk",
+      "version": "0.1.20",
+      "filename": "openviking_sdk-0.1.20-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/2c/95/c05a33be342ce1fada86874029d69ac67772a55afdad9c80dda1763bafcc/openviking_sdk-0.1.20-py3-none-any.whl",
+      "sha256": "ef41f6fc7787a94b9d7a86710b9b9487c74d553c7ef5bfc8e4636569928d195b",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "packaging",
+      "version": "26.3",
+      "filename": "packaging-26.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl",
+      "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "parsel",
+      "version": "1.12.1",
+      "filename": "parsel-1.12.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e9/44/2ff782553b581b3d55632eb4f9de1dc792ca99de7e47f69e22af28a9ef2d/parsel-1.12.1-py3-none-any.whl",
+      "sha256": "cf74e09857329bddc02c13ae239a9b46f410dc5bd1d05361c8c2643a1a5a7149",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "pathspec",
+      "version": "1.1.1",
+      "filename": "pathspec-1.1.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl",
+      "sha256": "a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "pdfminer-six",
+      "version": "20260107",
+      "filename": "pdfminer_six-20260107-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/20/8b/28c4eaec9d6b036a52cb44720408f26b1a143ca9bce76cc19e8f5de00ab4/pdfminer_six-20260107-py3-none-any.whl",
+      "sha256": "366585ba97e80dffa8f00cebe303d2f381884d8637af4ce422f1df3ef38111a9",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "pdfplumber",
+      "version": "0.11.10",
+      "filename": "pdfplumber-0.11.10-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a2/9a/07d658e1e7fad860f1c541ab941348125dbdab773be3a0afaf32361866c7/pdfplumber-0.11.10-py3-none-any.whl",
+      "sha256": "7741ea81bf165b474b153e6789d10d18e06b6ddcf3ec84289c3ef2fed6802580",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "platformdirs",
+      "version": "4.14.5",
+      "filename": "platformdirs-4.14.5-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7c/ae/ecbbbfd0e4343a6a521d49b3c8656fb4643dee2a4f6eaf941cf3280391a8/platformdirs-4.14.5-py3-none-any.whl",
+      "sha256": "8e778c6fa421516f4d3369449f8df3b0e1b72c0e0005fe88e3ec772d0a14e750",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "prometheus-client",
+      "version": "0.26.0",
+      "filename": "prometheus_client-0.26.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/eb/a3/b69efbf4143b5b9859b977770bbbabcc2796b702fa69dc40271e45cd5a56/prometheus_client-0.26.0-py3-none-any.whl",
+      "sha256": "fa93d06737aa02bacd05794768508bb97d2fbee28cb3bca04eaae92f0ca953d6",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "propcache",
+      "version": "0.5.4",
+      "filename": "propcache-0.5.4-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f5/cd/785c64ed382f3f04201870267b02783f63b4678c2acfddc177a3ebcc2727/propcache-0.5.4-py3-none-any.whl",
+      "sha256": "62c60aec739ed00124573cce1178138fd690c7676352d67a37328c1cf51d7468",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "protego",
+      "version": "0.7.0",
+      "filename": "protego-0.7.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c0/20/e4382a85e4cf4746d11746481f83360b990165725dd36ba73d55e029e6a9/protego-0.7.0-py3-none-any.whl",
+      "sha256": "944638aaee608f6c83fcad442695f3f9381a60be8d5007248f46b00f201fa5fc",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "protobuf",
+      "version": "7.36.2",
+      "filename": "protobuf-7.36.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e4/04/d52c7016b04b6c5108f26691f9d33ec82a9b65d041f1a9c771137693d618/protobuf-7.36.2-py3-none-any.whl",
+      "sha256": "bdb3a345d48db958e6ce1f18e508beb0cc981d64f24088427549c866cd039f1e",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "py",
+      "version": "1.11.0",
+      "filename": "py-1.11.0-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f6/f0/10642828a8dfb741e5f3fbaac830550a518a775c7fff6f04a007259b0548/py-1.11.0-py2.py3-none-any.whl",
+      "sha256": "607c53218732647dff4acdfcd50cb62615cedf612e72d1724fb1a0cc6405b378",
+      "requires_python": ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+    },
+    {
+      "name": "pycparser",
+      "version": "3.12",
+      "filename": "pycparser-3.12-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b6/ae/315bbeee126a769cbde43cf4908acb4b40408d8bf8bbf334dd7368d8dadf/pycparser-3.12-py3-none-any.whl",
+      "sha256": "a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "pydantic-settings",
+      "version": "2.16.3",
+      "filename": "pydantic_settings-2.16.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/4c/26/3e68379ca313b6aa58e11fbd8b28d5c6f1b9f4428d70222ba021a76797ec/pydantic_settings-2.16.3-py3-none-any.whl",
+      "sha256": "d1db16a2d34006323a1b42c0640898da58adfbad7ec30baaa9e2b18aafc08999",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "pydantic",
+      "version": "2.14.3",
+      "filename": "pydantic-2.14.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/72/b8/b864503789ef5c58597d2a7b4adbee62c26440ab1e682581fc6838df8947/pydantic-2.14.3-py3-none-any.whl",
+      "sha256": "3f7b347782ab7e4cf4c798496ae3a82787d9f21ec12676a9c564355eeef8daa8",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "pydispatcher",
+      "version": "2.0.7",
+      "filename": "PyDispatcher-2.0.7-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/66/0e/9ee7bc0b48ec45d93b302fa2d787830dca4dc454d31a237faa5815995988/PyDispatcher-2.0.7-py3-none-any.whl",
+      "sha256": "96543bea04115ffde08f851e1d45cacbfd1ee866ac42127d9b476dc5aefa7de0",
+      "requires_python": ""
+    },
+    {
+      "name": "pygments",
+      "version": "2.21.0",
+      "filename": "pygments-2.21.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl",
+      "sha256": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "pyjwt",
+      "version": "2.15.1",
+      "filename": "pyjwt-2.15.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/50/ca/44de4e75f8aadc457f0634be3b542815078ded46dca30efb960edeecad6e/pyjwt-2.15.1-py3-none-any.whl",
+      "sha256": "42d59d631f7768a1028a64c7ff581a9bf7519804daf91fc5b6c56e30eec5e193",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "pyopenssl",
+      "version": "26.4.0",
+      "filename": "pyopenssl-26.4.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/51/ad/2cf6d3fa2fae5c79e1ed9960c0d42badd0f94d81dd12b50604cdc839e648/pyopenssl-26.4.0-py3-none-any.whl",
+      "sha256": "f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "pypdfium2",
+      "version": "5.15.2",
+      "filename": "pypdfium2-5.15.2-py3-none-android_23_arm64_v8a.whl",
+      "url": "https://files.pythonhosted.org/packages/73/cf/a4adc114427c7e72716aaa487ddff7d085791dbe5ac830f2345f61814f3c/pypdfium2-5.15.2-py3-none-android_23_arm64_v8a.whl",
+      "sha256": "fe64472c32d0717669c99758ce234066500b0234730dad0327248f09399e9736",
+      "requires_python": ">=3.6"
+    },
+    {
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "filename": "python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+      "sha256": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+      "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
+    },
+    {
+      "name": "python-dotenv",
+      "version": "1.2.4",
+      "filename": "python_dotenv-1.2.4-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/60/d1/38f3a3405989a89ac18390803e70c6ad7c7760da4f9b83cbeca0c44a0c72/python_dotenv-1.2.4-py3-none-any.whl",
+      "sha256": "42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "python-multipart",
+      "version": "0.0.34",
+      "filename": "python_multipart-0.0.34-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f5/0e/090c52b122d8ec5fa37942c1410fea9cf04ce98bca0c84dde7f0aa11594d/python_multipart-0.0.34-py3-none-any.whl",
+      "sha256": "ebacd224bd686eee2f9aa1066a657affe07435a185834e05e5235e2e59173e91",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "pytz",
+      "version": "2026.6",
+      "filename": "pytz-2026.6-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b6/25/564f3fc5b70c1398d706c51f2b1470d0ea0b1b2f96fee67877b6f5bdf3b6/pytz-2026.6-py2.py3-none-any.whl",
+      "sha256": "7fed3fee8fd6bd4a2b7b75a8d56021d0624127bf69bd5691f115db929ac570b3",
+      "requires_python": ""
+    },
+    {
+      "name": "queuelib",
+      "version": "1.10.0",
+      "filename": "queuelib-1.10.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/bc/78/715c431c72ab296e1d4540e9dbbbc78f086bed3cdb04fc68fb32c6232d0b/queuelib-1.10.0-py3-none-any.whl",
+      "sha256": "257936b7202d12325c80ad79e254c59e2cd3533704ae6dffb567b1a0b309ae5e",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "readerwriterlock",
+      "version": "1.0.10",
+      "filename": "readerwriterlock-1.0.10-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/62/9c/d496912967d3c8d498e962f61a93bffc9304a0f09fd8e632a90a0b375d37/readerwriterlock-1.0.10-py3-none-any.whl",
+      "sha256": "788c28ca2da19681e466609774252eb55a963286c6f7cf8ace13d0be21a69683",
+      "requires_python": ">=3.6"
+    },
+    {
+      "name": "referencing",
+      "version": "0.37.0",
+      "filename": "referencing-0.37.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/2c/58/ca301544e1fa93ed4f80d724bf5b194f6e4b945841c5bfd555878eea9fcb/referencing-0.37.0-py3-none-any.whl",
+      "sha256": "381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "requests-file",
+      "version": "3.0.1",
+      "filename": "requests_file-3.0.1-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e1/d5/de8f089119205a09da657ed4784c584ede8381a0ce6821212a6d4ca47054/requests_file-3.0.1-py2.py3-none-any.whl",
+      "sha256": "d0f5eb94353986d998f80ac63c7f146a307728be051d4d1cd390dbdb59c10fa2",
+      "requires_python": ""
+    },
+    {
+      "name": "requests-toolbelt",
+      "version": "1.0.0",
+      "filename": "requests_toolbelt-1.0.0-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/3f/51/d4db610ef29373b879047326cbf6fa98b6c1969d6f6dc423279de2b1be2c/requests_toolbelt-1.0.0-py2.py3-none-any.whl",
+      "sha256": "cccfdd665f0a24fcf4726e690f65639d272bb0637b9b92dfd91a5568ccf6bd06",
+      "requires_python": ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+    },
+    {
+      "name": "requests",
+      "version": "2.34.2",
+      "filename": "requests-2.34.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl",
+      "sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "retry",
+      "version": "0.9.2",
+      "filename": "retry-0.9.2-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/4b/0d/53aea75710af4528a25ed6837d71d117602b01946b307a3912cb3cfcbcba/retry-0.9.2-py2.py3-none-any.whl",
+      "sha256": "ccddf89761fa2c726ab29391837d4327f819ea14d244c232a1d24c67a2f98606",
+      "requires_python": ""
+    },
+    {
+      "name": "rich",
+      "version": "15.0.0",
+      "filename": "rich-15.0.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/82/3b/64d4899d73f91ba49a8c18a8ff3f0ea8f1c1d75481760df8c68ef5235bf5/rich-15.0.0-py3-none-any.whl",
+      "sha256": "33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb",
+      "requires_python": ">=3.9.0"
+    },
+    {
+      "name": "s3transfer",
+      "version": "0.19.3",
+      "filename": "s3transfer-0.19.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e2/a4/88f9e10498759121060b8050a1554753dfc04df39bbbcc7aad9ecc8d9440/s3transfer-0.19.3-py3-none-any.whl",
+      "sha256": "24eb7535804306355e31c952a90022bf5b2f9d760f9a11062c7493a217c08553",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "scrapy",
+      "version": "2.20.0",
+      "filename": "scrapy-2.20.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/29/36/aaa956ac44a4920ed0410d7300bab48c6e04f17690c3c3f9e0f1edd425e2/scrapy-2.20.0-py3-none-any.whl",
+      "sha256": "e425ff161422de4916206cef4381ac31a5df50c47fab39ad16d9c7551597dd47",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "service-identity",
+      "version": "26.1.0",
+      "filename": "service_identity-26.1.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/93/eb/2433e1af4ff903499144de4846569fb3300b816179ae99a03c2f011b666a/service_identity-26.1.0-py3-none-any.whl",
+      "sha256": "68c32dadbb69135fb951077677e07cd7f6031020f3a8c8f47a28cda8a0742118",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "shellingham",
+      "version": "1.5.4",
+      "filename": "shellingham-1.5.4-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl",
+      "sha256": "7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686",
+      "requires_python": ">=3.7"
+    },
+    {
+      "name": "six",
+      "version": "1.17.0",
+      "filename": "six-1.17.0-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl",
+      "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+      "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
+    },
+    {
+      "name": "sniffio",
+      "version": "1.3.1",
+      "filename": "sniffio-1.3.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl",
+      "sha256": "2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2",
+      "requires_python": ">=3.7"
+    },
+    {
+      "name": "soupsieve",
+      "version": "4.1.1",
+      "filename": "soupsieve-4.1.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/cd/65/7fae69a095696195334a934eab23aeb12e2715e6c3f08025d2f91942750e/soupsieve-4.1.1-py3-none-any.whl",
+      "sha256": "8ff3422dab0b720fb667ee79864d80531a0e57994a13eb701697719ffcb751f6",
+      "requires_python": ">=3.11.5"
+    },
+    {
+      "name": "sse-starlette",
+      "version": "3.7.0",
+      "filename": "sse_starlette-3.7.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/6a/11/25cabac0a24fa76f58637d8671b549c90d818d69d26beecf0c59a3b186e0/sse_starlette-3.7.0-py3-none-any.whl",
+      "sha256": "f1d3136caa12d129284fca3d2ded79bc9af943320b6472712955fea52a6d3eea",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "starlette",
+      "version": "1.10.0",
+      "filename": "starlette-1.10.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/88/2e/947cfe02def9371c07cd5bf5b6b61c829e9aecb9904db02a66cfafbc1eec/starlette-1.10.0-py3-none-any.whl",
+      "sha256": "478c0ab3b4ced6e82719849c118fa406f0278a3499c1a898cd15cd31bdc38ce4",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "tabulate",
+      "version": "0.10.0",
+      "filename": "tabulate-0.10.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl",
+      "sha256": "f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "tenacity",
+      "version": "9.2.1",
+      "filename": "tenacity-9.2.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d6/26/1ff2b0721ac66a3ec5b1402b333110b352ab0a8724052ac279a7b82d40c4/tenacity-9.2.1-py3-none-any.whl",
+      "sha256": "9e56f17539296baab7beabb08b92f6ee3d7be92d8be72d763360677c2ad6580e",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "tinycss2",
+      "version": "1.5.1",
+      "filename": "tinycss2-1.5.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/60/45/c7b5c3168458db837e8ceab06dc77824e18202679d0463f0e8f002143a97/tinycss2-1.5.1-py3-none-any.whl",
+      "sha256": "3415ba0f5839c062696996998176c4a3751d18b7edaaeeb658c9ce21ec150661",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "tldextract",
+      "version": "5.4.0",
+      "filename": "tldextract-5.4.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b8/e0/d5760e222a7e3f3aec7ef59f6dff952af27d09ec168bcca50751d9698151/tldextract-5.4.0-py3-none-any.whl",
+      "sha256": "7f02aed30bd3b6ad5717192eb859a39b20aafc7caf3917d9cf6cb00a58efb34f",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "tqdm",
+      "version": "4.70.1",
+      "filename": "tqdm-4.70.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl",
+      "sha256": "c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "trafilatura",
+      "version": "2.3.1",
+      "filename": "trafilatura-2.3.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f5/20/e95d135c417aceaa3d34d1b4dff9aceb85e98800480eca1b033933717169/trafilatura-2.3.1-py3-none-any.whl",
+      "sha256": "f86bad2ee36f82884e14dee84c83aae0f0ac0127da5c65764e82f3846716b822",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "truststore",
+      "version": "0.10.5",
+      "filename": "truststore-0.10.5-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/51/e9/3a7820be2bb0fe53b6bc9c3be26d3d1158004e4c3ab953aa6840b955b1e9/truststore-0.10.5-py3-none-any.whl",
+      "sha256": "9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "twisted",
+      "version": "26.10.0",
+      "filename": "twisted-26.10.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/10/93/fdfa79229fdc19a6542086d46b5c5d424ee62a6408d25657e8690e0a745f/twisted-26.10.0-py3-none-any.whl",
+      "sha256": "3732f42af218925a0fe78d6668db55853f7fb532245a89a2669babe7d3000fa8",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "typer",
+      "version": "0.29.1",
+      "filename": "typer-0.29.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/05/ff/51969745f31cea6bcd12151e668febcf979656316e67a7755942267c1273/typer-0.29.1-py3-none-any.whl",
+      "sha256": "00dbc549c13428bec1be55fe1f4d0fb8c6637a310e4f178ef14abe9534ee7b58",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "filename": "typing_extensions-4.16.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+      "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "typing-inspection",
+      "version": "0.4.5",
+      "filename": "typing_inspection-0.4.5-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/de/0c/ea2544850a7c135e15033a5c7a8e7211136184b7ae63e2239d557c2b3019/typing_inspection-0.4.5-py3-none-any.whl",
+      "sha256": "bc210535442b39e1bf2805e0c7a17dfd6a4ace760c84c7f7d16245d23a6b1c39",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "tzlocal",
+      "version": "5.4.5",
+      "filename": "tzlocal-5.4.5-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7b/c1/9be4e1a8a30db8729a86628073910e56f85aaf8a659e053f376a2e6ea5a8/tzlocal-5.4.5-py3-none-any.whl",
+      "sha256": "ecab534f6d65d9deb4c4ea52c121ab6dd5958e9b878e71dcb102578269752454",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "urllib3",
+      "version": "2.8.0",
+      "filename": "urllib3-2.8.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl",
+      "sha256": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "uvicorn",
+      "version": "0.54.0",
+      "filename": "uvicorn-0.54.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/38/0c/b54a4fdd7f90a3af8b02ebc9ce6712c2c208b7926a2f7bad95c33ebbe943/uvicorn-0.54.0-py3-none-any.whl",
+      "sha256": "505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "volcengine-ark-runtime",
+      "version": "5.0.58",
+      "filename": "volcengine_ark_runtime-5.0.58-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/37/c7/493f75d549fa102f4150319bfe25f51618bf2d8026663c66ee36d508cb0a/volcengine_ark_runtime-5.0.58-py3-none-any.whl",
+      "sha256": "67d9bd20b76f4a1a308cd054bdcbb38b250746796567356e59ce367b806abf8b",
+      "requires_python": ">=3.7"
+    },
+    {
+      "name": "volcengine-python-sdk",
+      "version": "5.0.58",
+      "filename": "volcengine_python_sdk-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/bb/cc/8e9dc40873a6eb8d392c3d45dbea77f141fc4626e23b2fc8a6c3ef127a3b/volcengine_python_sdk-5.0.58-py2.py3-none-any.whl",
+      "sha256": "33131ed370bbe36f1f9fa57ffa28327441a7d385a32e656ed9ba6aa57fafbb68",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcengine",
+      "version": "1.0.229",
+      "filename": "volcengine-1.0.229-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/00/eb/7585c6440e810d00c8aada0e72fd8feb407f0ef962d393c17ffeb7adda4a/volcengine-1.0.229-py3-none-any.whl",
+      "sha256": "dc7372657d4ce786157fe0afe89ddc02039dfb320567efe2dfdf60c3e9b85eb6",
+      "requires_python": ">=3.7"
+    },
+    {
+      "name": "volcenginesdk-acep",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_acep-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/62/92/993bd559bc9ff223d976f7edaa3714e23b7a57af02d27bcecc035acdda2c/volcenginesdk_acep-5.0.58-py2.py3-none-any.whl",
+      "sha256": "0fb1ac06cbd6dc40fdfd8104d2daf24e9cd29ee9a987b4b4d751ab8aeb603062",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-advdefence20230308",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_advdefence20230308-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f5/8f/3d885790f998f1b97556f8932741ec2aa8bcbd03543fd0ec77c7f4dec665/volcenginesdk_advdefence20230308-5.0.58-py2.py3-none-any.whl",
+      "sha256": "584fdf6504f82ca1173baef8850bea0acd8970022b3e7bb52b9b42b4daf14453",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-advdefence",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_advdefence-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f8/d9/a08fd6f219f2efff6c1aeea074ead91bfe48356c5a04f7687661fdf2ba56/volcenginesdk_advdefence-5.0.58-py2.py3-none-any.whl",
+      "sha256": "7fa2132b1a4f452e623c41e1ba0687c3a6226bfe923957fa4307be5a914b33af",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-aidap",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_aidap-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/31/0d/207931145fa563d382a9d3175c86c09148acb40a8d703a214ae2e16725d5/volcenginesdk_aidap-5.0.58-py2.py3-none-any.whl",
+      "sha256": "3330bb0c6cd4d1373fdcd02a8fa04d1c17978e8bbc490707e7b76888f2384392",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-aiotvideo20231001",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_aiotvideo20231001-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/17/77/09bf39ca49051978e6e13630a0e5db6054e97090caf3d34554585eaebdb0/volcenginesdk_aiotvideo20231001-5.0.58-py2.py3-none-any.whl",
+      "sha256": "24ce01cce7f422edba07986a759f52ba43ce5c220a6c5bd099653806e1249526",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-aiotvideo",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_aiotvideo-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f3/a0/d0bb838a6c0b6b87e44b1d9f98ee21c276a5cd34ec71b02cc11c1d325bba/volcenginesdk_aiotvideo-5.0.58-py2.py3-none-any.whl",
+      "sha256": "2d84fd35069c08b1ec5b83e1d668733a385ca4fe6581be99e32690df9087bea4",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-alb",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_alb-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d4/ee/fed04956e88228fe58c1d9bbd42f387323afbf002c5ef61c0833d226a724/volcenginesdk_alb-5.0.58-py2.py3-none-any.whl",
+      "sha256": "5385313d165e7c933e5dcece26f0854a3d1d8e33030e6ff15ad9e97429c3e117",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-apig20221112",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_apig20221112-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/1a/50/946a060a45973b5fbad1efb26385319efbfcc5dd8953c915a3b071ef3e8b/volcenginesdk_apig20221112-5.0.58-py2.py3-none-any.whl",
+      "sha256": "c7d58fe0d37c7e7cf7d82f0bb9fbea5efefb110296e6a8a2ce12e9831056850f",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-apig",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_apig-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/9d/93/a435cdd47c935f9c7387fe8f95ea9ff337f9595f5109b8cdb2b40fa533cc/volcenginesdk_apig-5.0.58-py2.py3-none-any.whl",
+      "sha256": "d51a2c436a0c55102fce1d08752b9742290eec7513c4e3ccec7b318c5893499d",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-apmplusserver",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_apmplusserver-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7d/b3/f84e9f0ac81463cccd4a7456d5e5ca98abf7e81cc76efae055dd35152c6a/volcenginesdk_apmplusserver-5.0.58-py2.py3-none-any.whl",
+      "sha256": "8f08366bb6c5b90f4bdf3a226591e135166fe27472a158383cf578b0e529e975",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-ark",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_ark-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/5e/17/2092eb5d94898980d3b42122fb0195df727a54a392ae6eb2e257199f62c5/volcenginesdk_ark-5.0.58-py2.py3-none-any.whl",
+      "sha256": "69ba1f3c7cc04ce8d9affdb51f928fd68c79bb5251fb5133d12d1ef493c4f81c",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-arkclaw",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_arkclaw-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d8/57/0f2815dc8192a57f2810a03f921608d1c69c7637cb832deea5090589056e/volcenginesdk_arkclaw-5.0.58-py2.py3-none-any.whl",
+      "sha256": "79a0b4113d5b069dba291de5f983a01208f98f592d07febe729838cb6f5b3a18",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-autoscaling",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_autoscaling-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f2/c5/4fc7578a2b30e907b0ffaba4a3d106033d813934603914c86549d0e5e3ab/volcenginesdk_autoscaling-5.0.58-py2.py3-none-any.whl",
+      "sha256": "19f6f9af627869b1a8d24cf8404a18abbb0a0246b6de65c13d0e503f3b340ab2",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-billing",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_billing-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/85/21/af93af836a34ef4c4fbc476af291068a244a18f5c9a6920cc2c722786848/volcenginesdk_billing-5.0.58-py2.py3-none-any.whl",
+      "sha256": "6197e6f427ad051919c2237d7ce4765833f130cd2ac9a9a4db3f702cddb19ec8",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-bio",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_bio-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/36/2d/a02d605f80194d80c5f93dc70a5b2950383a8ee15c057d28ecc67abc3bd9/volcenginesdk_bio-5.0.58-py2.py3-none-any.whl",
+      "sha256": "0989411e054541577a4af6297106c6c9dc3b377893aae6315a6fb924bb33f951",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-bmq20240901",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_bmq20240901-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/9c/71/98cb269eee59bf027667ad4a7baff5da8ad3d1a838d24ab73e830f22b1cc/volcenginesdk_bmq20240901-5.0.58-py2.py3-none-any.whl",
+      "sha256": "cb8ffc9dff618167d3a98c90194441d1a009aaef3e7f69d0daef359d5944ea75",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-bmq",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_bmq-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/6d/9b/65e6af823969ac0b87f6d8f3807913c5429c1d5f34a1da2b8f7c642c1151/volcenginesdk_bmq-5.0.58-py2.py3-none-any.whl",
+      "sha256": "d551368352751f8a6c2c1954172447da1692d7795006e152e651706c20612f6b",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-bytehousece20240831",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_bytehousece20240831-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/ca/3d/266222329277afddc527dfcd564354babb362482db11644352be5717ee42/volcenginesdk_bytehousece20240831-5.0.58-py2.py3-none-any.whl",
+      "sha256": "3cf15316126d459fb861116c13667e6ab88949e56a89265fdd57639108be53dc",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cbr",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cbr-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/db/23/6709bf35575f2947f763b2730aaa9e28b2433c4f07118e639eab742b94b2/volcenginesdk_cbr-5.0.58-py2.py3-none-any.whl",
+      "sha256": "49a65d2b32552ee647ae532bff1e3a362632aaea11b66c09330e3e60fba6b831",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cdn",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cdn-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c6/31/c1310df7e3c7b55c4363dee3f71003f992d8701d6b6f604f8709817792ab/volcenginesdk_cdn-5.0.58-py2.py3-none-any.whl",
+      "sha256": "43788dec1eab0b338c18aece2adad80215ae7f8c1d306f8b947326de63ade2a9",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cen",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cen-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/23/a6/6add3cd5313808fdb79f0addba4ef6c2ea30b6971a333294f75798a19cab/volcenginesdk_cen-5.0.58-py2.py3-none-any.whl",
+      "sha256": "afa8d90ad416324664a19600b1c0267028945958f3201e31662ce190fd7dc9ed",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-certificateservice",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_certificateservice-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c0/07/51d7bf6b24dce4ff25fad5e2d4349550930e04508357228c2653722313b0/volcenginesdk_certificateservice-5.0.58-py2.py3-none-any.whl",
+      "sha256": "f5f9bb334e1e68912441cd0fc9420c3b104479ac85f6e93d255b9bd01cb2b990",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cfs",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cfs-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/90/9d/81738cae083d5aedec6a887be20469438a4c3ed828b30ddde98861c9eee5/volcenginesdk_cfs-5.0.58-py2.py3-none-any.whl",
+      "sha256": "c93f9a033f0e34f1061524d56858acc702cb511dc8e87c7a92a93d613a5f2f2b",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-clawsentry",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_clawsentry-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/84/c7/ad7ab47611dc9e53b53af922d5dd437c8ae93cfddb85e105cadeebf1fa65/volcenginesdk_clawsentry-5.0.58-py2.py3-none-any.whl",
+      "sha256": "67093c4762d40b3efbc52df03b301cf8013fd158ab382cb6189c343d287bee4a",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-clb",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_clb-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f6/e3/c9b8d804af98777402dee84f127fe1e34ba7c986b546a0da713ae2393a87/volcenginesdk_clb-5.0.58-py2.py3-none-any.whl",
+      "sha256": "6c896917f4cd30f5d5a04c38166cade3799f66b4b948839cf5117efa2380f8b9",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cloudcontrol",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cloudcontrol-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/82/97/71cc0ca8be5c7fff240e40f6f3e218ef77a975ca95736248f9459e5e8de8/volcenginesdk_cloudcontrol-5.0.58-py2.py3-none-any.whl",
+      "sha256": "f972dbd3720af6fadcf1b4b68f59920ae3d6cb6794803b006759bc0f9cfa8811",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-clouddetect20251031",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_clouddetect20251031-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d8/70/75f71592276ae8382e5552548e8b59f4c872e8e3d45f325035042eae03cb/volcenginesdk_clouddetect20251031-5.0.58-py2.py3-none-any.whl",
+      "sha256": "7fe93c2732de245c9112d5fdd7e2e08c32bd99f111940d1bb29c12fe85a94e97",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-clouddetect",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_clouddetect-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/1b/59/af0816fa37947e2ac3dc2c3f3cfdb1f2901023d629f63197103062745f7f/volcenginesdk_clouddetect-5.0.58-py2.py3-none-any.whl",
+      "sha256": "a540fc5d9ec5eb5514aaf9d4412fe590c2d9ed10797e4beb615fb91487a77438",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cloudidentity",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cloudidentity-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/04/df/9842d5bb027ead6d33eb6b666d981bdfdf166f7700a3908a9ce80c00df71/volcenginesdk_cloudidentity-5.0.58-py2.py3-none-any.whl",
+      "sha256": "0e954d3c3c210fc455349db79d26c4e7e0860ed98ceb1a53eff6df21f17a32d9",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cloudmonitor20251201",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cloudmonitor20251201-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e0/6e/aa7f5248c45451019b11267829c12aef7bd0ce88b43f53c8921026f28fa8/volcenginesdk_cloudmonitor20251201-5.0.58-py2.py3-none-any.whl",
+      "sha256": "c00dadcee4080d7c4632953e9fb7e861720d5ededdca5d027c1d612add7e2f64",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cloudmonitor",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cloudmonitor-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/fd/c5/3db150754c38c68afddce8eed0a9868a653ab1a913b9a5ae0c6528937b34/volcenginesdk_cloudmonitor-5.0.58-py2.py3-none-any.whl",
+      "sha256": "8ec8693395fbef1e0ac25d7a48a9dc6b0645775ae8cd11652cdc19475f33bac2",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cloudtrail20180101",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cloudtrail20180101-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/34/21/cac91110013ebdcafa549fd6de3cfea310ac15bde301b46f3b10d3c54bef/volcenginesdk_cloudtrail20180101-5.0.58-py2.py3-none-any.whl",
+      "sha256": "b03278b67ecd4926c2f63db6b989d6f1d230069640973833e41a594fca9dba89",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cloudtrail",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cloudtrail-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/9c/32/ac1b3d6586d6a1b73b8c74231c2bf3c67a8246a5a2cc8aa3c01d28a9444a/volcenginesdk_cloudtrail-5.0.58-py2.py3-none-any.whl",
+      "sha256": "e101baf6092979c3a4c40bbce7ed0862397c192ce3098096555d9b1dc7f3eb7b",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-config",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_config-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/de/aa/ae3d1b267831cf97445674f425ef9693f3df584f0d447efbe5199773fabd/volcenginesdk_config-5.0.58-py2.py3-none-any.whl",
+      "sha256": "703dda7d36c97a61b428e0d5f13eafd5f0775b0d1eac888939c70473175240aa",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-core",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_core-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/37/95/da5ed746152f3dcf16c3e1117f5e7715e58f14e0844305bf9531e2757911/volcenginesdk_core-5.0.58-py2.py3-none-any.whl",
+      "sha256": "afcf62e9fd9351517c1aa5f5b63f1e6c846d994f9fcc174042823407a44012fe",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-coze20250601",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_coze20250601-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/ce/68/db7be5599511c0243031386fc766156152b9ef8ca5edacf8cdc245dda28c/volcenginesdk_coze20250601-5.0.58-py2.py3-none-any.whl",
+      "sha256": "05076c69aa1583a5b209a0741e8d34ab3388040c4791e201ccb54899a5d84bce",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cp",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cp-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f4/e7/b92334fa35e321579ee446dd6a12b83092a0a2d0ff5253359eda009f5ca2/volcenginesdk_cp-5.0.58-py2.py3-none-any.whl",
+      "sha256": "a88914f4802b52f42a0fb07020a8c9219967f17ba9221636da85d1b8e9e8d3e4",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cpaas",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cpaas-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/6a/ae/76f58fcfc6dca681908234313545f389d291ceeb47011bae041b2e3cdc7b/volcenginesdk_cpaas-5.0.58-py2.py3-none-any.whl",
+      "sha256": "5bd1e172d29ccea820ea9713f481c5e2232f4dd956b3894f266b9277845bd96b",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cr",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cr-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/3a/ff/21918db51ff927f5ddcbd8f27abc03dd3b62ff4023079e4533903e4d5f6c/volcenginesdk_cr-5.0.58-py2.py3-none-any.whl",
+      "sha256": "f4eaf7a1f98a85ce505a2e575da80932d6d3d11cd1943fe23e70c3e6192a30d6",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-cv20240606",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_cv20240606-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/dd/22/bb579e46fd2ab42a7963287af64b3de334fab67f05651e901aeefda6fe7e/volcenginesdk_cv20240606-5.0.58-py2.py3-none-any.whl",
+      "sha256": "082d0e55e5cf3273051cc64e9f34b29238470bd3af83f22b04a4e3228f927803",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-dataleap20260301",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_dataleap20260301-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/dd/27/4c0502c0dda91be85021a572f0d78d3b36c2e26f80ebc279dd82214928ea/volcenginesdk_dataleap20260301-5.0.58-py2.py3-none-any.whl",
+      "sha256": "b8c7cc546a9084c15fc51e1394b1f8adaebb8568004afa290b5d7a24bfbcd285",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-dataleap",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_dataleap-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/01/aa/dcbf32ddf458f6c0c4cc83e0cc961b135d4980a7d3c081c56f9de0263aae/volcenginesdk_dataleap-5.0.58-py2.py3-none-any.whl",
+      "sha256": "fa02535620f9e6877502d7b813131476425dbb091626cad5660d66504072136e",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-dbw",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_dbw-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/1b/74/3f5945f6011ba875d2704821a11c13f483deb8d7944d48080e9264555434/volcenginesdk_dbw-5.0.58-py2.py3-none-any.whl",
+      "sha256": "2ba584adffe4ea686bf9406976e287256054bf488e0dee3f847f73c8f912260b",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-directconnect",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_directconnect-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/74/e5/f4dad4eb73020dedd11492bb0e08fb83b3010844068edc3356b967ab0a7c/volcenginesdk_directconnect-5.0.58-py2.py3-none-any.whl",
+      "sha256": "85429290c9a5e09e70a2f19469bd284cdce3afd79ccaebdef83997ec47f5dd6b",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-dms20250101",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_dms20250101-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/76/14/26038f135a5f0d927af39d9bbd5c205ac60f1bbdbd5f0bc3e5ed3787d5f5/volcenginesdk_dms20250101-5.0.58-py2.py3-none-any.whl",
+      "sha256": "e829c9d9404c229e336fa64d1bb9a769dcd8162516ef77702d9f4dcde35ba563",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-dms",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_dms-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/25/d3/a3bc5e6557debfe2c3629f38b92d7afec2eab59ccad27335cc874ec44ae0/volcenginesdk_dms-5.0.58-py2.py3-none-any.whl",
+      "sha256": "63419e8717d881e99548b6a270b93db2d0c5c0a109333ddcc64ec222ba1f3b0a",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-dns",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_dns-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/bb/6e/5cf001f28d76e19b31b8c0fd3b445bcd1ff739a6ef3f99c1e89a2008e970/volcenginesdk_dns-5.0.58-py2.py3-none-any.whl",
+      "sha256": "f60b1116952dd41d2c97c6597ea8a5ba352130146a9789a17d914306b84c46ff",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-dramart",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_dramart-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/be/94/55f9c2c8a535b4326f397a367e14f0e9265f953053a48e4d47b02d24cce7/volcenginesdk_dramart-5.0.58-py2.py3-none-any.whl",
+      "sha256": "5ba84a9304122355022d44045f3908460a876ae25c4d6e0b2c0318e85af4a8ef",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-dts20180101",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_dts20180101-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d5/99/e606e685bf8a723702a627f4f892270a8463829e0103b65ca94229262468/volcenginesdk_dts20180101-5.0.58-py2.py3-none-any.whl",
+      "sha256": "2275ad187d70aae284198d2d005ab057bd0dcc310afaf2e445beeff007f4fa07",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-dts",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_dts-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/80/8f/72a16befda44e1f0381225e26c63a4de6676a363cab60084890f805b369b/volcenginesdk_dts-5.0.58-py2.py3-none-any.whl",
+      "sha256": "58697338e7ecf9c01180e81cf606a203c9bcad455593dde93da0ced5246212f4",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-ecs",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_ecs-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/bc/4f/06873aa4ebd9292c9221efb2acb641fb216c27e05852c47edd20c1f1caeb/volcenginesdk_ecs-5.0.58-py2.py3-none-any.whl",
+      "sha256": "7955b9d5b8786a941af67a8def12515abf0918682118a3c05f5e5a4970f59ef5",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-edx",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_edx-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a3/21/171ebdd824f70e891c11612d755167473b9529795afed200961e7c2c91b0/volcenginesdk_edx-5.0.58-py2.py3-none-any.whl",
+      "sha256": "a14b5e653478beb1e97ad10ea4449bf22f8854eac2358d41b14e3711998a422a",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-efs",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_efs-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b1/e5/845708ae6794bb0c2be677b6c88e25d0ec30bd64ede4bd68767140f95f13/volcenginesdk_efs-5.0.58-py2.py3-none-any.whl",
+      "sha256": "5883a0fda08a09694ff136bb2ecea8507925f5145c22644a1729a1951216a0db",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-emr",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_emr-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/6c/e8/9071bfad1d6819a9f4d0c5658bf85b1f09e9124f921f66174518caa2dea2/volcenginesdk_emr-5.0.58-py2.py3-none-any.whl",
+      "sha256": "b7187ade95aefa2adcc40901e18f2f8c56f854563f342d9884f19f61458f8529",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-escloud",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_escloud-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/81/2c/4615ac784bc9300793e8b68cfe5fd62721f816a65cff7832066e56dd7f6a/volcenginesdk_escloud-5.0.58-py2.py3-none-any.whl",
+      "sha256": "0d96cef260aa97f260c80192ce4c18e8a4d9b0ee9cb97d0f2ebdc4e2ed60dc80",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-fasttrack",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_fasttrack-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f5/05/7e0665f8d7ecb368da378b42ac485f395e9ebb2801ea868a3b125ee7a24a/volcenginesdk_fasttrack-5.0.58-py2.py3-none-any.whl",
+      "sha256": "156f2b0b5d10978966d2286ea75ed24d70e684776cf3d6404e3077c068cb2fd9",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-filenas",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_filenas-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/39/20/76b3b00e86114874ede54db09c49a45b0bfb9b2328eee6356c17c82878cd/volcenginesdk_filenas-5.0.58-py2.py3-none-any.whl",
+      "sha256": "b185b6ec0f525bb0e7c5acfcbf3ff91cdb701c438449c839fa3e26cbb19efb43",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-flink20250101",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_flink20250101-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/27/48/72d138d1f631c4ac73280ac2630cc982e204e2434ef94739f77bc939228d/volcenginesdk_flink20250101-5.0.58-py2.py3-none-any.whl",
+      "sha256": "8fa840b8942e7f90ecaec39400face613dda7ba8c351fd6bb9bebe66397e5a1e",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-fwcenter",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_fwcenter-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7b/a0/dd5275c09bf2b085b6d53c2fb74a3850f6a9e5ca2ca531fe726af8d5f34c/volcenginesdk_fwcenter-5.0.58-py2.py3-none-any.whl",
+      "sha256": "e0b7acff90ebc15866d22884406aef91ef8b0b0f4f745bf5cd7860e19bc39fb9",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-ga",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_ga-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e0/c6/3a3baec2a612638af1a291dd509a6fbbcb142c2ed9b7ba3b5a11c857fdcd/volcenginesdk_ga-5.0.58-py2.py3-none-any.whl",
+      "sha256": "8fd5f4499a69b7dcedc60f34c1cdafde2fec9308dd5b7c008ec1dc51650a632d",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-graph20250815",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_graph20250815-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/dd/5d/69a2ea5116ad40321a3371efda46912d03c748503a87a9e6c42c9bd4a0c6/volcenginesdk_graph20250815-5.0.58-py2.py3-none-any.whl",
+      "sha256": "3117dd626b1d36270530caf381c339a4874138b9d41048b1080fda97cf673464",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-graph",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_graph-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/ba/31/eff996c3d6bcdd12792e6dd24f4959acaa0f5568c8d1aa53ca6ebe60f298/volcenginesdk_graph-5.0.58-py2.py3-none-any.whl",
+      "sha256": "889f23f98e3f65299a00668273f1dd6972d7073cef69bca26b8144f450ead7f5",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-gtm",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_gtm-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c5/1b/cfc5ffa13525324ad22927fd94a0afe9e5577aa10b9cda505459374a2e86/volcenginesdk_gtm-5.0.58-py2.py3-none-any.whl",
+      "sha256": "9237586a552cbbf9f45940518f6b88ea4eb6edf1ba43a8aa8fda4de0d67375d7",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-hbase",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_hbase-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/fa/7e/d7637d8b92a033a65e5c2eb842ace83b21d955a711cd836d9a809456ae4d/volcenginesdk_hbase-5.0.58-py2.py3-none-any.whl",
+      "sha256": "d18361102945b4aaa83d522171fe161a41a2871e7599ec588f6f11f8fce85411",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-httpdns",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_httpdns-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a9/b8/1d420921d93bfaecf3726576aceafd57b66ef10c7d6bf16fdfed410488fd/volcenginesdk_httpdns-5.0.58-py2.py3-none-any.whl",
+      "sha256": "b8283b6a0802532279a44a29d5521c4d28c8e457995f4891d3eea90c0c7a7738",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-i18nopenapi",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_i18nopenapi-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/3d/12/36c15ba1d7c56a8dcd928c38f4088a27d30e42b041d8468a3d5af26bbed1/volcenginesdk_i18nopenapi-5.0.58-py2.py3-none-any.whl",
+      "sha256": "341dda51f4175eaa2fd82c43c72a3b23da95227c25447c3f901c547f1f92dafb",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-iam20210801",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_iam20210801-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f8/85/8ee55f4195b18ead4f5fbb6ca20a62564b9b98b12bdc7ec1b52323262c0c/volcenginesdk_iam20210801-5.0.58-py2.py3-none-any.whl",
+      "sha256": "f87b97754adef6e00cc492d801e7ea79de19442340d6e3f8bb901c736c9fd26e",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-iam",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_iam-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/12/da/8116ec60eabd4357e510b7f7e395f8e8143d99c09ade1fcaedd75e80158d/volcenginesdk_iam-5.0.58-py2.py3-none-any.whl",
+      "sha256": "c036fe12e74051564044375ef81cdec4ee489d0a3a3f26024f43a429c737d26a",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-id",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_id-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/57/f1/4e592d7fd28d04dbd045634249c9a781388914161de5041b8f49e87f3c32/volcenginesdk_id-5.0.58-py2.py3-none-any.whl",
+      "sha256": "7e4e3e5a688f350bb097838795a77f0b0add01bcbf869e0c12971614b8cd2e50",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-inframanager",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_inframanager-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/3a/fa/e7e413c94fc4494a506e8b535d587e7762f56d5937fa836eea4ea78bd7a5/volcenginesdk_inframanager-5.0.58-py2.py3-none-any.whl",
+      "sha256": "06449b583fca0160af9cb83e574a68169c37624dc83d57ff086e7ab8d56495e4",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-insight",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_insight-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/51/9e/f106bd7b7d677caeb49bec86f77fedee02c0775b63155778a9a8822070b7/volcenginesdk_insight-5.0.58-py2.py3-none-any.whl",
+      "sha256": "da7901979fb0eefcdffea85f72713fb349a275ae3e904b3c265d77344a380d9e",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-kafka",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_kafka-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/ea/15/a442ec08602d79cad0a0cc0fd1e1ce4e20edbc21edce835849b9fa1de2e1/volcenginesdk_kafka-5.0.58-py2.py3-none-any.whl",
+      "sha256": "4c90a6017cb4f02e520f95bf8bdce0114e267e27df034697c38dff51f041c1aa",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-kms",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_kms-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/6c/77/f2877c12529416275246f2daca28d65978c5137d392e58f789b2deb7f2ed/volcenginesdk_kms-5.0.58-py2.py3-none-any.whl",
+      "sha256": "6cc5d192b1b8f0d045b10eac4598dd3d3591adc2066b21d355c18bc766e2a6b8",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-livesaas20230801",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_livesaas20230801-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/00/6f/f3a77c6d822ff5be1787649f2e8b93a27358c8d6df760f346b9c16ab454d/volcenginesdk_livesaas20230801-5.0.58-py2.py3-none-any.whl",
+      "sha256": "43f015e76fc46f555b7639327646ed337d0a49f84fdc0346ce8b31a20aa622cf",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-livesaas",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_livesaas-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b9/f5/e3ca8e99e103d6c1172603e7687240f8d7232eaf78e51fe643fd48444242/volcenginesdk_livesaas-5.0.58-py2.py3-none-any.whl",
+      "sha256": "9dac9e543e8bd9e5c9f7316a9c951b13aef48655ba5554cdc3465b43e980f789",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-llmscan",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_llmscan-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/3b/9e/5450a01c9ae66ae6ffe559fef76ac4257da6c2910547e30a4b7d91e22c14/volcenginesdk_llmscan-5.0.58-py2.py3-none-any.whl",
+      "sha256": "2c081f34e3885cb3505fd7b94cd8db5145cc957e07a8b7b33251666f2ad4a289",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-llmshield",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_llmshield-5.0.58-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/95/f0/315fcfb878ccc28f61ea9143003dd16ba9396de0406416ec95549dc20dfa/volcenginesdk_llmshield-5.0.58-py3-none-any.whl",
+      "sha256": "0278f5e84e76884104bd45a1ed99f2655235a9aa57c57e4696848df9e374118e",
+      "requires_python": ">=3.8"
+    },
+    {
+      "name": "volcenginesdk-mcdn",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_mcdn-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/5f/30/878baa4206a3285f9ebf608c990ba7bef5d94e4135c15f9ed84d6581ce51/volcenginesdk_mcdn-5.0.58-py2.py3-none-any.whl",
+      "sha256": "64735d96a2287fcb681892fda558c8b2cf1b4153e096107a3e42543aa2a682e7",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-mcs",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_mcs-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/8a/04/af4ad4e879029c1e83b522743f063766055916aab0d8eaefc8c95b28da5a/volcenginesdk_mcs-5.0.58-py2.py3-none-any.whl",
+      "sha256": "f4ba6e33c65a516a69dc0499ff38bd5109ae9e557ca0fb1bbe8756cf1e626f4b",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-mem0",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_mem0-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/6d/51/a4d8926292153f35757cd52d66ca5ab83ee24d8ebe4b1896e69a88f91b9b/volcenginesdk_mem0-5.0.58-py2.py3-none-any.whl",
+      "sha256": "225b7d5909c373d70f1b98788a3fc0f17135284851239109dba47d81eff635c5",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-metakms",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_metakms-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/5a/da/1fb4fbeb671bccc93c4be6f23370cd1984e3bcfb04babc6ddce64a04c882/volcenginesdk_metakms-5.0.58-py2.py3-none-any.whl",
+      "sha256": "61a452550d9b1b486205b15104c183c5bf792840235d4dd51bdf082dc45fba00",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-milvus",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_milvus-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/12/1f/05b7d10d736e9ace9b6f017ddace5f4863ae5597682499a7a2fa1d6bd52c/volcenginesdk_milvus-5.0.58-py2.py3-none-any.whl",
+      "sha256": "61dba2e0f0a022f222feec061d14e64d3a9c29530428544583fdedba22db1558",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-mlplatform20240701",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_mlplatform20240701-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/cb/2c/2a8991b79ad4e9df7fb0d6088b980311fe9ca9cd776d912e8a2fe6a418ea/volcenginesdk_mlplatform20240701-5.0.58-py2.py3-none-any.whl",
+      "sha256": "a51ff6f962edca66be4f37c74521d496f3b6b2599ef0cfb1912fb48914860ea7",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-mongodb",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_mongodb-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/9b/9b/3342d5dcfd817274316783111f1471e9ab3583f7eafc080a229502ac999c/volcenginesdk_mongodb-5.0.58-py2.py3-none-any.whl",
+      "sha256": "c58161dd97c082866028d3a89b631b31b274a18597eb24615bc4bd510a81fd6c",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-mse",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_mse-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/82/a8/c99f5493cf85aba8e7d25055c9c6ab9d307e29268bc132cf26c28436f370/volcenginesdk_mse-5.0.58-py2.py3-none-any.whl",
+      "sha256": "05ae5ecb379e456fdd65a2a894aabebded6d6d3defa91bf3ae865c6c12ab5af4",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-na",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_na-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/bf/cb/0396e9e5f19eb26b444c8222c1bd3891091c944c32852d4f0401bbb8f8ba/volcenginesdk_na-5.0.58-py2.py3-none-any.whl",
+      "sha256": "28bb7f552a3174bddb26c22235053a857fbe386d7641ac621028102b5481099f",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-natgateway",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_natgateway-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/0e/cf/c883a6a82dbb5284071e69277debce12c6bbabad86b38ebc970ce3d30fc2/volcenginesdk_natgateway-5.0.58-py2.py3-none-any.whl",
+      "sha256": "ff085cb8d0d621c2b674ac4a080e5c22bb00b1947fade1ed46e582bc8fea1ebe",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-nta",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_nta-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/6e/16/037bbecc260edbaec09e6f7142f1be8cad6dc5977ba2303a3432a8147f13/volcenginesdk_nta-5.0.58-py2.py3-none-any.whl",
+      "sha256": "2773eeba6dd20867bd9b0fe6e24664092864c188c18f5b7d0bcf69e3d692e587",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-organization",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_organization-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/16/5c/890c8fb5c7209f42149c16ed908fb74a050170cac8a70cdff105de1b69b0/volcenginesdk_organization-5.0.58-py2.py3-none-any.whl",
+      "sha256": "7f456ed1548591b1611656413701b0f598c2cffa01aca876d9fa192efd930ba4",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-origindefence",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_origindefence-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e3/9e/42372ff2cd73d391bd74b137b07c139358d0b5e4f9115026019d8ded9733/volcenginesdk_origindefence-5.0.58-py2.py3-none-any.whl",
+      "sha256": "f8dadb29d46760d5abad0d30d30526dd4c3334ba8cf3e6962ef5d122122efab8",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-partner",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_partner-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d6/39/cc5e8c6d15c2e61ac0e7e4696c3751a4466580b07c9708636fb149831de8/volcenginesdk_partner-5.0.58-py2.py3-none-any.whl",
+      "sha256": "e66cacd8cb50e061e5ce0e7621ac87dc907b7e03781cca479ba6219bed117af4",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-pca20251001",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_pca20251001-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/19/12/dc7453f90855c5987a86101495d1d6df43b9721ae6eedfa1965294416901/volcenginesdk_pca20251001-5.0.58-py2.py3-none-any.whl",
+      "sha256": "64cd11fa426635a90bb3de6dd5f0b9bded02c7f84f3ce6eb3eb90215532c77a7",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-pca",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_pca-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a0/f7/4e7367d8181d2b2e4fcc40e687b5218c22d55965e08b21894b43f7cca31e/volcenginesdk_pca-5.0.58-py2.py3-none-any.whl",
+      "sha256": "32146b71c78314f2b0f9db3b955e4e81652b144645d088a5029dca34c7665699",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-privatelink",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_privatelink-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/6c/70/d961fcc17e4411ea06d1040637f5569004c7b3f07ffe40248c69fdc362a7/volcenginesdk_privatelink-5.0.58-py2.py3-none-any.whl",
+      "sha256": "bcfc08ffa0d2e177903fe9ce696358d00b5af567bb99d384f3b725ea09d47a24",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-privatezone",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_privatezone-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/97/cb/66cebd41a5f5aa01bc6f4a5d5b3ab82acd739f03b245bafe3977c537fb94/volcenginesdk_privatezone-5.0.58-py2.py3-none-any.whl",
+      "sha256": "a2fcf674d4d743386725c509177328065fa06e68f0f034750f6ef7a6cdca5831",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-quota",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_quota-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/9b/50/b2b40f7032bd25a9cf2a6e0b5b5d14f20364e0fc4264337059df13ac0a0b/volcenginesdk_quota-5.0.58-py2.py3-none-any.whl",
+      "sha256": "62356d1f3bd180c868243b60d10827a9537dd19f71a5639549fa364804f78728",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-rabbitmq",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_rabbitmq-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f7/68/c4ababb1112d0da01c0a7d26dff7dd50d3b2cdeb5242a6b3697936bcc5a8/volcenginesdk_rabbitmq-5.0.58-py2.py3-none-any.whl",
+      "sha256": "925de7856e2cb0ce53a2ca0c771af62f09b7ac488dbb0743b9b0b0b1acd63549",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-rcs5g",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_rcs5g-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/ef/66/c55cc4098816c3aebeccbddfb0f57fe9678eb5d5ce15cc447c08413bce06/volcenginesdk_rcs5g-5.0.58-py2.py3-none-any.whl",
+      "sha256": "db643a8acddd84e19e4844dfc892344fee41cc97fb3efed9e8525efc3ff0e971",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-rdsmssql",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_rdsmssql-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/a6/41/34820a4dbf831b9782a2ecc19075bbc505fac004e3d1790be5ed2f7acff3/volcenginesdk_rdsmssql-5.0.58-py2.py3-none-any.whl",
+      "sha256": "bb01e421f9c3367dfd5dcc31e10764398bf37f1cfcfd003720cf9b5c412908e5",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-rdsmysql",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_rdsmysql-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b2/db/a0aec1871b7392063c54c2019acf8e1b6a6b6160fd29f2f6ef1f9c1b2afa/volcenginesdk_rdsmysql-5.0.58-py2.py3-none-any.whl",
+      "sha256": "a18c29dc88900f352c0578128781452233ead60cb4a99ef65fecc0cb8c88b656",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-rdsmysqlv2",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_rdsmysqlv2-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c4/76/54d22d261122e3565a57a8c3c8e2ce2b181ed60745310b7238184c0e8231/volcenginesdk_rdsmysqlv2-5.0.58-py2.py3-none-any.whl",
+      "sha256": "c86614be9cc63e71c34012b6b83aa8ad36f23073a0eaf062fb32082a3e0f26f7",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-rdspostgresql",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_rdspostgresql-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c1/27/d6c3611a11ece7f7aa0a0bddc7420f5d8fbf978294b01ea546ee5fe80e39/volcenginesdk_rdspostgresql-5.0.58-py2.py3-none-any.whl",
+      "sha256": "322ca2fc8821507e1099d1cd1153cd243e64462fae4ca2e006ef62880b110351",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-redis",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_redis-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/29/d2/cbaefbbc7d651cbdfc828bc0df4c9bf14522c0869b2e0cbf61d4e99deaab/volcenginesdk_redis-5.0.58-py2.py3-none-any.whl",
+      "sha256": "4ad4229a919b97bd60af8ae7a64f2ae347a6833bed42dfecb6479b611435757d",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-resourcecenter",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_resourcecenter-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/0d/81/beaa27f61296c5d3ecc8cb87d066d5729eef0769d8e304a686f0b05ed971/volcenginesdk_resourcecenter-5.0.58-py2.py3-none-any.whl",
+      "sha256": "ebcc609aab3f2fea542df26109c54af8db00a0536919f9cca17383b411054feb",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-resourceshare",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_resourceshare-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/fa/bb/ea5f65e059a599340c1258ecb35e953d26c30ef4a193fb154e5ae4b71b2f/volcenginesdk_resourceshare-5.0.58-py2.py3-none-any.whl",
+      "sha256": "243855fe4e719100094b0ae351f855269a79e6dc3b1442290c0002166a11c125",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-rocketmq",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_rocketmq-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/10/9d/8e4dd4626bf442ea1405a5d84380a293a42b2d005e8178acf9bb02305c9e/volcenginesdk_rocketmq-5.0.58-py2.py3-none-any.whl",
+      "sha256": "de1c4b7778bd297580042aa7c151c4fb02eb614be298c28271d866eb1f82be60",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-secagent",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_secagent-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e6/06/226f74616056b04465a2b7574016d0616546ed48619b986995d4dda4fce3/volcenginesdk_secagent-5.0.58-py2.py3-none-any.whl",
+      "sha256": "cd2a2d3c0f6f629d4cad900712e1369845da2d2ad56c62f2845fdce02100e512",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-seccenter20240508",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_seccenter20240508-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c2/4e/5826271fd8ecbaf514e5511cd8aa0b3e62cf84af229a278042bd37c5e92d/volcenginesdk_seccenter20240508-5.0.58-py2.py3-none-any.whl",
+      "sha256": "99a02b2b6611fa1b8276c8e86c0e03ee4e2ac4e075b8e09c85730b35fca456de",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-seccenter",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_seccenter-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7c/a3/fa563894ad8e947c483086868c35059557c1fbcc329082f709816508754a/volcenginesdk_seccenter-5.0.58-py2.py3-none-any.whl",
+      "sha256": "db9f712b207bea3528edf4c40f1c575ff67a283ded4baa9a1a4cd987a7db7ade",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-smc",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_smc-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e0/fc/e8c59572c9702ee115b7ab91ab62d3e8025166f7a8f5c06fa2188f3c1213/volcenginesdk_smc-5.0.58-py2.py3-none-any.whl",
+      "sha256": "d22d9d61c9c121fa8161754e751ed5686b7457a00ebb34a09a5d82b1a89ec02d",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-spark",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_spark-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/27/16/76cf4faeca66b1a6d140a7af318de69fdd7e7aae9c9ba7368ce371d826d2/volcenginesdk_spark-5.0.58-py2.py3-none-any.whl",
+      "sha256": "c0d2b3e53cc40a9d9461e4c804feaf261eb6621b8e80a4b1a48c96e224917d72",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-speechsaasprod20250521",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_speechsaasprod20250521-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/db/c0/23345f0d51108edb30f8983547561e060f85eff7052a76b191e6c71087d1/volcenginesdk_speechsaasprod20250521-5.0.58-py2.py3-none-any.whl",
+      "sha256": "c87e2fc05c83b16f1a93b7e5904d47587dbfacd678768b52a197fc5adb01d837",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-speechsaasprod",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_speechsaasprod-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/d3/de/b5be386c69e5a060926864b7e3bcf8e1c4ac41dd53983f4c401becae32e8/volcenginesdk_speechsaasprod-5.0.58-py2.py3-none-any.whl",
+      "sha256": "18fcb968d03932ad3b11f99aabb377005e2f1cd5b7e11d0328f64e305c0303e0",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-sqs",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_sqs-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/73/4f/03be0f66281c3bcce7ae2e2ce026a94cfa1df191dcededf4d84c4ff9d554/volcenginesdk_sqs-5.0.58-py2.py3-none-any.whl",
+      "sha256": "bc3d24b681baade77569c94163174a75a58397c5a6202b6b41127170b1aeb882",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-storageebs",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_storageebs-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c8/56/adee22abbf2f4bddf7217c9aa75b42fe810adeb094baac082f2a4ad74eb2/volcenginesdk_storageebs-5.0.58-py2.py3-none-any.whl",
+      "sha256": "87497f39b6d74376e77328531e2db6b8f5ef6e03cc5e1e69f535ab546e5a993b",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-sts",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_sts-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/2c/77/e2a2740d524249339033b9cc43c1dede329ae633a07edc172f7170892f4d/volcenginesdk_sts-5.0.58-py2.py3-none-any.whl",
+      "sha256": "3c74e83b00e0d3d02cfe05c4865e943aee6c39d4ebc11b46827dd5700a346810",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-tag",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_tag-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/74/25/405736f8e891c446b904019e5409a587b299118b22a11c8cc876871abc36/volcenginesdk_tag-5.0.58-py2.py3-none-any.whl",
+      "sha256": "c92b9212bad4ba7453d1033f97f010ffa77a1948b952fa828fd00dbc1eaf3129",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-tidb",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_tidb-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/0b/99/97328b1d313c4e5c9f7f803e0e76553228babc606dbf57a8b4f88d38b464/volcenginesdk_tidb-5.0.58-py2.py3-none-any.whl",
+      "sha256": "86cc1375f928c725cf3624e2b82818b76d9d4e02f6455ae0fc94fccc4a0f80c8",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-tis",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_tis-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/67/79/28ca4e73cdbdb43004e93654cf60852e5a78acc28e39c093340af0bb9ab1/volcenginesdk_tis-5.0.58-py2.py3-none-any.whl",
+      "sha256": "c7fbab2f040860fd582197c7198409c0a387354ca476805aec1dc41fb04bad09",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-transitrouter",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_transitrouter-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/80/25/878f742c3b86534d32eef973c3954dfeacf70e1cca4a089b81adcbedf040/volcenginesdk_transitrouter-5.0.58-py2.py3-none-any.whl",
+      "sha256": "42fb35ae83584f6bb50d1132121fb61dd91739778477dc3227c50832e40008e3",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-translate20250301",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_translate20250301-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/98/91/926c2977fe9847971e4875395d45319a9913e5b21887d892b8b4b95e7238/volcenginesdk_translate20250301-5.0.58-py2.py3-none-any.whl",
+      "sha256": "d75ed52360ddf746013c48dd6d0c7cd10ce21fdb8be9ab3b72613622a7e17b14",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vedbm",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vedbm-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/60/f6/708521c1d47049f8524c21f4fcad965efe45d599895159ef97feb9ed3d9c/volcenginesdk_vedbm-5.0.58-py2.py3-none-any.whl",
+      "sha256": "3fadf0647c362d3526ec71b66ac82942fa5215eba86495fcfd79a536697041d3",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-veenedge",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_veenedge-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/68/50/b14b1531b9eb478c13abfaee08700c2a9c59c4c0e63ade9de57801cd933a/volcenginesdk_veenedge-5.0.58-py2.py3-none-any.whl",
+      "sha256": "754e4f11122e5bfddfd149c0472001f62a3e35b7f4f2c3bdd0c64530d7edfaf6",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vefaas",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vefaas-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/71/c6/60322c91d0a2cf4005a68c51094a9d1d74c278dac0c705e7c70a452037d4/volcenginesdk_vefaas-5.0.58-py2.py3-none-any.whl",
+      "sha256": "9509462ae975006f716583581d6cdded6557361f8bb4379a7a76162c010aa846",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vefaasdev",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vefaasdev-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c4/f0/62092cb47406ed7d9abf64dd7cacb0acff700942a064ac45e99a96343cde/volcenginesdk_vefaasdev-5.0.58-py2.py3-none-any.whl",
+      "sha256": "ab45bd02f10c0282462932541578679023f10c5db878271d01183590828a4494",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-veiapi",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_veiapi-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/00/e4/123e77c07b3c75c06f53cc524a628348bbea2d39511c3dbbf7b1c46f1e26/volcenginesdk_veiapi-5.0.58-py2.py3-none-any.whl",
+      "sha256": "b667e82303a2cc45b5ef132b5263815e1e6ea0b5c3b227d46191b3daba59e755",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vepfs",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vepfs-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c7/c0/7274e84a6d6d418bef93ac30f6c3e4b7c820878393726b6d6e45b06d51b8/volcenginesdk_vepfs-5.0.58-py2.py3-none-any.whl",
+      "sha256": "ba473337bd8b7f4eb2e0ace5583422484a227d7fceb7582dcecce52487b45817",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vikingdb",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vikingdb-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/2a/a7/b706b6e2a0844fbe432ac0bef3b89fabb3814f63da8cf4bb611d51bdc304/volcenginesdk_vikingdb-5.0.58-py2.py3-none-any.whl",
+      "sha256": "4a4d23e069993700cdf3a34e4141c11aa4ead2f04c846b67ea2df361835eb5ee",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vke",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vke-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/7d/21/695001be5cda06adc42b746cdce506835a1350e86f3a408b261fbc5da1d1/volcenginesdk_vke-5.0.58-py2.py3-none-any.whl",
+      "sha256": "92b500745f3f4fd3116c62e83c4658883653d67b8a04ace9c988b555be189b4c",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vmp",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vmp-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b4/52/2fb0370faf600a4399309f901a5e69f98e1bf6b11eacbdc9ce5f8e5818e5/volcenginesdk_vmp-5.0.58-py2.py3-none-any.whl",
+      "sha256": "0dc5449eba6dce1f9db90a9e15d394f7fa0f1aecab67c240f638c4af119271d0",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vms",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vms-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/40/75/f21e81c6e2d8028e51a63cdf603937af9f9924486dfb363dd6040a095d18/volcenginesdk_vms-5.0.58-py2.py3-none-any.whl",
+      "sha256": "6442056105bf955aac07f0400488e22376f769bdd9ea7320f0076c24c02356f3",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vod20250101",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vod20250101-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/18/35/be6bd8d9d48e19676391b02b3d036835031ddfd5b73f707fd5303efb6cac/volcenginesdk_vod20250101-5.0.58-py2.py3-none-any.whl",
+      "sha256": "e36497467d26a9c77511340334372933e312944087611678e1f3aa47d9bd0837",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vod20260101",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vod20260101-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/c1/31/a19dc2aae8ef55ef338716c1484438e281f15a3d7db589f02f77f065aac8/volcenginesdk_vod20260101-5.0.58-py2.py3-none-any.whl",
+      "sha256": "b740e805ed48fea68b87c7e55007195b7e768d8a681221c451aa80657220bc3a",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-volcobserve",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_volcobserve-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/41/08/a3dbab2695c196e7f52140648bf4955ee22e9730a5a8f4509bcdf816be76/volcenginesdk_volcobserve-5.0.58-py2.py3-none-any.whl",
+      "sha256": "52d721c1bb62fd73dc07af6adbf710901bb2abcca4699a3652b34d44513c0d7a",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-volcsms",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_volcsms-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/fc/94/5a9cd41fd03b94610c6b252f1fe89681399958da62903cf1338d5ac502de/volcenginesdk_volcsms-5.0.58-py2.py3-none-any.whl",
+      "sha256": "ba51be8f18131d26bd605169b3a13dff99abde44fac27851559e05458903eba3",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vpc",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vpc-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/ff/ee/4ca30d44b59c8cd5b1e61569cfb64ced686f025706a24891c51a1700f959/volcenginesdk_vpc-5.0.58-py2.py3-none-any.whl",
+      "sha256": "9084a5d14395b498b632961c06463e59bea64acb03435876c8a2d3e1130c63b2",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-vpn",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_vpn-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e0/e9/95eed0aede412070c95f9cfe42bdf57a0e291027e9fec33c32677fecc517/volcenginesdk_vpn-5.0.58-py2.py3-none-any.whl",
+      "sha256": "e130d7943f4d9adbb726f21893bac9b8808a170f56b98b2f5c1d9f45e30eff08",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-waf",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_waf-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/91/16/197ec29e81964990388ae9be75973360721c633911eb6ba84a0de29eb39c/volcenginesdk_waf-5.0.58-py2.py3-none-any.whl",
+      "sha256": "1a64802ed762d5e70519f48755104935d22ad29598f66243b330f95413fe0857",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "volcenginesdk-wafruntime",
+      "version": "5.0.58",
+      "filename": "volcenginesdk_wafruntime-5.0.58-py2.py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/e4/6a/244e1c79cfeaf30d8d66e6a368135b1f5503001c0222cf2881233aa49f8f/volcenginesdk_wafruntime-5.0.58-py2.py3-none-any.whl",
+      "sha256": "df05da22256230dc72c044ae7b489c912d80289e848574859c84b56cffd441d5",
+      "requires_python": ">=2.7"
+    },
+    {
+      "name": "w3lib",
+      "version": "2.6.0",
+      "filename": "w3lib-2.6.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/aa/51/c3a48500fd4f211126b09d07850df33874455c432b7e8e5e0cfef8fcf7ba/w3lib-2.6.0-py3-none-any.whl",
+      "sha256": "e62ce6b7f845b5e8588223d44e64990673a0fefd6815d6b3f2e6d39bf9ef308c",
+      "requires_python": ">=3.11"
+    },
+    {
+      "name": "webencodings",
+      "version": "0.6.1",
+      "filename": "webencodings-0.6.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/77/c6/040cbc72480d789a5f40d63fb484d3106554c4dfa2d2b70ad5022057750f/webencodings-0.6.1-py3-none-any.whl",
+      "sha256": "7fab6269c8bf237c657876b52058ccb182e861518d1c695c1a9aaa8c1c105d5b",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "websockets",
+      "version": "15.0.1",
+      "filename": "websockets-15.0.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/fa/a8/5b41e0da817d64113292ab1f8247140aac61cbf6cfd085d6a0fa77f4984f/websockets-15.0.1-py3-none-any.whl",
+      "sha256": "f7a866fbc1e97b5c617ee4116daaa09b722101d4a3c170c787450ba409f9736f",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "wrapt",
+      "version": "2.5.2",
+      "filename": "wrapt-2.5.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/77/8b/1ea57b936b70f98e8e7620a352578096d778dbee95b262f73c066d210ffb/wrapt-2.5.2-py3-none-any.whl",
+      "sha256": "61eb54e9540ea522c2c4752a57549a83d3c67e6704ed708403d28e067aaf90f0",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "xxhash",
+      "version": "4.1.0",
+      "filename": "xxhash-4.1.0-cp314-cp314-android_24_arm64_v8a.whl",
+      "url": "https://files.pythonhosted.org/packages/20/b0/8e60185dbae0e874fbe5e28050ec7f014a90513789476db996160fa72600/xxhash-4.1.0-cp314-cp314-android_24_arm64_v8a.whl",
+      "sha256": "bd1b2cfd97e49601bf9c8fee8bc4f16d8ce2c358b9114efe742d0cd699c2b740",
+      "requires_python": ">=3.9"
+    },
+    {
+      "name": "yarl",
+      "version": "1.25.1",
+      "filename": "yarl-1.25.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/54/22/318c7980066769c6bcd9221ed2248294f5698811da099013098c670565ed/yarl-1.25.1-py3-none-any.whl",
+      "sha256": "681c758b0490f9e96b78e5fa8e8dc6e648e9185bb6eaebe73183c33ea0c445f3",
+      "requires_python": ">=3.10"
+    },
+    {
+      "name": "zipp",
+      "version": "4.1.2",
+      "filename": "zipp-4.1.2-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/b8/44/7bd2007260da11cccca29ba2d4c345f1287aa663db38ee7cefeabf6386a5/zipp-4.1.2-py3-none-any.whl",
+      "sha256": "b30cb6cd253122169c47de245ca24a86bac2a5d3802ba15bf7ba6414eb9e144d",
+      "requires_python": ">=3.10"
+    }
+  ],
+  "missing": [
+    {
+      "name": "argon2-cffi-bindings",
+      "version": "26.2.0"
+    },
+    {
+      "name": "brotli",
+      "version": "1.2.1"
+    },
+    {
+      "name": "cffi",
+      "version": "2.1.1"
+    },
+    {
+      "name": "cryptography",
+      "version": "50.0.2"
+    },
+    {
+      "name": "fastuuid",
+      "version": "0.14.0"
+    },
+    {
+      "name": "firecrawl-anydoc",
+      "version": "0.2.4"
+    },
+    {
+      "name": "frostwork",
+      "version": "0.2.2"
+    },
+    {
+      "name": "grpcio",
+      "version": "1.85.1"
+    },
+    {
+      "name": "hf-xet",
+      "version": "1.8.0"
+    },
+    {
+      "name": "jiter",
+      "version": "0.19.0"
+    },
+    {
+      "name": "litellm",
+      "version": "1.103.10"
+    },
+    {
+      "name": "lxml",
+      "version": "6.1.3"
+    },
+    {
+      "name": "orjson",
+      "version": "3.13.0"
+    },
+    {
+      "name": "pillow",
+      "version": "13.0.0"
+    },
+    {
+      "name": "pycares",
+      "version": "5.2.1"
+    },
+    {
+      "name": "pycryptodome",
+      "version": "3.24.1"
+    },
+    {
+      "name": "pydantic-core",
+      "version": "2.50.4"
+    },
+    {
+      "name": "pyyaml",
+      "version": "6.0.3"
+    },
+    {
+      "name": "rapidfuzz",
+      "version": "3.14.6"
+    },
+    {
+      "name": "regex",
+      "version": "2026.11.9"
+    },
+    {
+      "name": "rpds-py",
+      "version": "2026.9.1"
+    },
+    {
+      "name": "tiktoken",
+      "version": "0.14.0"
+    },
+    {
+      "name": "tokenizers",
+      "version": "0.23.3"
+    },
+    {
+      "name": "tree-sitter-c-sharp",
+      "version": "0.23.1"
+    },
+    {
+      "name": "tree-sitter-cpp",
+      "version": "0.23.4"
+    },
+    {
+      "name": "tree-sitter-go",
+      "version": "0.25.0"
+    },
+    {
+      "name": "tree-sitter-java",
+      "version": "0.23.5"
+    },
+    {
+      "name": "tree-sitter-javascript",
+      "version": "0.25.0"
+    },
+    {
+      "name": "tree-sitter-language-pack",
+      "version": "1.13.3"
+    },
+    {
+      "name": "tree-sitter-lua",
+      "version": "0.5.0"
+    },
+    {
+      "name": "tree-sitter-php",
+      "version": "0.24.1"
+    },
+    {
+      "name": "tree-sitter-python",
+      "version": "0.25.0"
+    },
+    {
+      "name": "tree-sitter-rust",
+      "version": "0.24.0"
+    },
+    {
+      "name": "tree-sitter-typescript",
+      "version": "0.23.2"
+    },
+    {
+      "name": "tree-sitter",
+      "version": "0.25.2"
+    },
+    {
+      "name": "zope-interface",
+      "version": "8.7"
+    }
+  ]
+}
