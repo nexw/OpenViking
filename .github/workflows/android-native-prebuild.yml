@@ -10,24 +10,25 @@ name: Android Native Prebuild
 # Why an NDK cross build and not the regular `_build.yml` wheel jobs: the two
 # extensions use the stable API (Py_LIMITED_API >= 3.10), but must link bionic
 # and the selected Termux libpython. They require that CPython minor version on
-# the device despite the abi3 tag. A manylinux/glibc extension cannot load here.
+# the device, so the wheel tags must name that exact minor, not abi3.
+# A manylinux/glibc extension cannot load here.
 #
-# Outputs, all tagged `...android_24_arm64_v8a` so Termux's pip/uv accepts them:
-#   openviking-<ver>-cp310-abi3-android_24_arm64_v8a.whl    full package wheel
+# Outputs (API tag follows android_api_level; default 24):
+#   openviking-<ver>-cp314-cp314-android_24_arm64_v8a.whl   full package wheel
 #                                                           (carries all three)
-#   ragfs_python-<ver>-cp310-abi3-android_24_arm64_v8a.whl  standalone binding
+#   ragfs_python-<ver>-cp314-cp314-android_24_arm64_v8a.whl standalone binding
 #   openviking-native-android-aarch64-<ver>.tar.gz          runtime bundle for
 #                                                           source checkouts
 #
-# Consume on the device, either way:
-#   pip install openviking-<ver>-cp310-abi3-android_24_arm64_v8a.whl --no-deps
+# Native-only component checks (NOT a complete application installation):
+#   pip install openviking-<ver>-cp314-cp314-android_24_arm64_v8a.whl --no-deps
 #   # or, for a source checkout:
 #   python scripts/build_support/android_native.py install \
 #       openviking-native-android-aarch64-<version>.tar.gz --root . --force
-# Both extensions link Termux's libpython (PyO3 does that for Android targets and
-# the NDK's -Wl,--no-undefined needs it), so the device must run the same CPython
-# minor version: run `pkg upgrade python` if an import reports a missing
-# libpython3.X.so.
+# Both extensions explicitly link Termux's libpython, and the NDK's
+# -Wl,--no-undefined enforces resolution, so the device must run the same CPython
+# minor version. Use a matching existing interpreter or a private extracted
+# runtime; do not upgrade the device's system Python just to run a smoke test.
 #
 # Only hosted runners are used (see tests/misc/test_linux_runner.py): the NDK
 # cross-compiles aarch64 from x86_64, so no self-hosted pool is involved.
@@ -44,7 +45,7 @@ on:
         required: false
         default: 'https://packages.termux.dev/apt/termux-main'
       termux_python_version:
-        description: 'Pin the Termux CPython minor version (e.g. 3.13; default: newest)'
+        description: 'CPython minor (empty uses pinned profile; only 3.14 is supported)'
         required: false
         default: ''
       version:
@@ -88,9 +89,8 @@ jobs:
     env:
       ANDROID_API_LEVEL: ${{ inputs.android_api_level || '24' }}
       TERMUX_REPO: ${{ inputs.termux_repo || 'https://packages.termux.dev/apt/termux-main' }}
-      # Empty = newest python in the Termux repo. The extensions link that
-      # libpython, so pin this when a device is still on an older CPython.
-      TERMUX_PY_VERSION_PIN: ${{ inputs.termux_python_version || '' }}
+      # A different minor requires a separately reviewed target profile.
+      REQUESTED_TERMUX_PY_VERSION: ${{ inputs.termux_python_version || '' }}
       # Extensions must be bionic, so they are NDK cross builds.
       PY_TARGET: aarch64-linux-android
       # The CLI is shipped as a fully static musl binary: `machine-uid`
@@ -100,12 +100,6 @@ jobs:
       CLI_TARGET: aarch64-unknown-linux-musl
       # ccache is picked up by Cargo (cc-rs) and by the CMake build below.
       CCACHE_MAXSIZE: 512M
-      # Stable-ABI extensions deliberately leave Py* undefined and let the
-      # interpreter provide them at dlopen time. glibc's ld allows that, but the
-      # NDK's clang wrapper passes -Wl,--no-undefined, so the unresolved-symbol
-      # check has to be relaxed for every cargo link against this target.
-      CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS: >-
-        -Clink-arg=-Wl,--unresolved-symbols=ignore-all
     steps:
       - uses: actions/checkout@v6
         with:
@@ -117,6 +111,22 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
+
+      - name: Load pinned Android target profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m scripts.build_support.android_target env --out "$RUNNER_TEMP/android-target.env"
+          source "$RUNNER_TEMP/android-target.env"
+          if [[ -n "$REQUESTED_TERMUX_PY_VERSION" && "$REQUESTED_TERMUX_PY_VERSION" != "$TERMUX_PY_VERSION_PIN" ]]; then
+            echo "::error::termux_python_version must be $TERMUX_PY_VERSION_PIN; another minor requires a reviewed Android target profile"
+            exit 1
+          fi
+          if [[ ! "$ANDROID_API_LEVEL" =~ ^[0-9]+$ ]] || (( ANDROID_API_LEVEL < 24 )); then
+            echo '::error::android_api_level must be an integer >= 24'
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/android-target.env" >> "$GITHUB_ENV"
 
       # The NDK cross build needs CPython artifacts that were compiled *for
       # bionic*: pyconfig.h carries the Android-specific ABI settings, and
@@ -131,6 +141,7 @@ jobs:
             --dest "$RUNNER_TEMP/termux-sysroot" \
             --repo "$TERMUX_REPO" \
             --python-version "$TERMUX_PY_VERSION_PIN" \
+            --expected-sha256 "$TERMUX_PYTHON_DEB_SHA256" \
             --write-env "$RUNNER_TEMP/termux-sysroot.env"
           cat "$RUNNER_TEMP/termux-sysroot.env" >> "$GITHUB_ENV"
 
@@ -143,18 +154,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          uv python install "$TERMUX_PY_VERSION"
-          host_py="$(uv python find "$TERMUX_PY_VERSION")"
+          uv python install "$ANDROID_BUILD_PYTHON"
+          host_py="$(uv python find "$ANDROID_BUILD_PYTHON")"
           "$host_py" -V
           echo "HOST_PY=$host_py" >> "$GITHUB_ENV"
 
-      - name: Locate the Android NDK
+      - name: Install the pinned Android NDK
         shell: bash
         run: |
           set -euo pipefail
-          ndk="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-${ANDROID_NDK:-}}}"
-          if [[ -z "$ndk" || ! -d "$ndk" ]]; then
-            echo '::error::no Android NDK on this runner (ANDROID_NDK_LATEST_HOME is unset)'
+          sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?Android SDK missing}}"
+          ndk="$sdk/ndk/$ANDROID_NDK_REVISION"
+          if [[ ! -d "$ndk" ]]; then
+            sdkmanager --install "ndk;$ANDROID_NDK_REVISION"
+          fi
+          revision="$(awk -F'= ' '/^Pkg.Revision/ {print $2}' "$ndk/source.properties")"
+          if [[ "$revision" != "$ANDROID_NDK_REVISION" ]]; then
+            echo "::error::expected NDK $ANDROID_NDK_REVISION, found $revision"
             exit 1
           fi
           ndk_bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
@@ -166,7 +182,8 @@ jobs:
           {
             echo "NDK_ROOT=$ndk"
             echo "NDK_BIN=$ndk_bin"
-            echo "ANDROID_NDK_VERSION=$(basename "$ndk")"
+            echo "ANDROID_NDK_VERSION=$revision"
+            echo "NDK_VERSION=$revision"
           } >> "$GITHUB_ENV"
 
       # cc-rs/build-scripts pick the NDK up through the per-target CC/CXX/AR
@@ -185,12 +202,14 @@ jobs:
             echo "AR_aarch64_linux_android=$NDK_BIN/llvm-ar"
             echo "RANLIB_aarch64_linux_android=$NDK_BIN/llvm-ranlib"
             echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$cc"
+            # Target-specific only: do not leak libpython into the static musl CLI.
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS=-L$TERMUX_PREFIX/lib -Clink-arg=-Wl,--no-as-needed -Clink-arg=-lpython$TERMUX_PY_VERSION -Clink-arg=-Wl,--no-undefined"
           } >> "$GITHUB_ENV"
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: stable
+          toolchain: ${{ env.ANDROID_RUST_TOOLCHAIN }}
           targets: aarch64-linux-android,aarch64-unknown-linux-musl
 
       - uses: ./.github/actions/compiler-cache
@@ -209,7 +228,7 @@ jobs:
             # `uv run --no-project`: the repo's own dependency set cannot resolve
             # here (tree-sitter-php publishes platform wheels only) and we only
             # need setuptools_scm to reproduce setup.py's version scheme.
-            version="$(uv run --no-project --with 'setuptools-scm>=8' python -c \
+            version="$(uv run --no-project --with 'setuptools-scm==9.2.2' python -c \
               'import sys; sys.path.insert(0, "."); from scripts.build_support.versioning import resolve_openviking_version; print(resolve_openviking_version())')"
           fi
           echo "OPENVIKING_VERSION=$version" >> "$GITHUB_ENV"
@@ -225,18 +244,28 @@ jobs:
         run: |
           set -euo pipefail
           ZIG_VERSION=0.13.0
+          ZIG_SHA256=d45312e61ebcc48032b77bc4cf7fd6915c11fa16e4aad116b66c9468211230ea
+          CARGO_ZIGBUILD_VERSION=0.24.1
           zig_dir="$RUNNER_TEMP/zig-$ZIG_VERSION"
           if [[ ! -x "$zig_dir/zig" ]]; then
             mkdir -p "$zig_dir"
-            curl -fsSL "https://ziglang.org/download/$ZIG_VERSION/zig-linux-x86_64-$ZIG_VERSION.tar.xz" \
-              | tar -xJ --strip-components=1 -C "$zig_dir"
+            archive="$RUNNER_TEMP/zig-$ZIG_VERSION.tar.xz"
+            curl -fsSL --retry 3 "https://ziglang.org/download/$ZIG_VERSION/zig-linux-x86_64-$ZIG_VERSION.tar.xz" -o "$archive"
+            echo "$ZIG_SHA256  $archive" | sha256sum -c -
+            tar -xJf "$archive" --strip-components=1 -C "$zig_dir"
           fi
           # $GITHUB_PATH only affects later steps, so extend PATH here as well.
           export PATH="$zig_dir:$PATH"
-          zig version
-          if ! command -v cargo-zigbuild >/dev/null; then
-            cargo install --locked cargo-zigbuild
+          test "$(zig version)" = "$ZIG_VERSION"
+          installed="$(cargo zigbuild --version 2>/dev/null || true)"
+          if [[ "$installed" != "cargo-zigbuild $CARGO_ZIGBUILD_VERSION" ]]; then
+            cargo install --locked --force --version "$CARGO_ZIGBUILD_VERSION" cargo-zigbuild
           fi
+          {
+            echo "CLI_ZIG_VERSION=$(zig version)"
+            echo "CLI_ZIG_ARCHIVE_SHA256=$ZIG_SHA256"
+            echo "CLI_CARGO_ZIGBUILD_VERSION=$(cargo zigbuild --version)"
+          } >> "$GITHUB_ENV"
           cargo zigbuild --release --locked --target "$CLI_TARGET" -p ov_cli
 
       - name: Stage ov CLI
@@ -246,11 +275,10 @@ jobs:
           cp "target/$CLI_TARGET/release/ov" openviking/bin/ov
           chmod +x openviking/bin/ov
 
-      # PyO3 always links libpython for Android targets
-      # (pyo3_build_config::is_linking_libpython_for_target), which is exactly what
-      # Android's linker needs: a stable-ABI module only resolves its Py* symbols
-      # through its own DT_NEEDED entry. PYO3_CROSS_LIB_DIR therefore points at the
-      # extracted Termux prefix so the correct libpython3.X.so is recorded.
+      # Android needs an explicit libpython DT_NEEDED entry for each extension.
+      # PYO3_CROSS_LIB_DIR supplies the target configuration; the target-specific
+      # RUSTFLAGS above force libpython linkage even for extension-module mode.
+      # These same flags also apply to maturin's standalone wheel build below.
       - name: Build ragfs-python (PyO3 abi3)
         shell: bash
         run: |
@@ -302,7 +330,7 @@ jobs:
       - name: Verify the native artifacts
         run: |
           python3 scripts/build_support/android_native.py verify --root . \
-            --python-version "$TERMUX_PY_VERSION"
+            --readelf "$NDK_BIN/llvm-readelf" --python-version "$TERMUX_PY_VERSION"
 
       # Studio is optional: the server works without the /studio bundle, so a
       # Vite failure must not block the native artifacts.
@@ -325,7 +353,7 @@ jobs:
           set -euo pipefail
           uv venv --python "$HOST_PY" "$RUNNER_TEMP/wheel-venv"
           uv pip install --python "$RUNNER_TEMP/wheel-venv/bin/python" \
-            'setuptools>=61' 'setuptools-scm>=8' wheel 'maturin>=1.10,<2'
+            'setuptools==84.2.1' 'setuptools-scm==9.2.2' 'wheel==0.48.0' 'maturin==1.16.0' 'packaging==26.3'
 
       - name: Build ragfs-python wheel
         shell: bash
@@ -353,12 +381,28 @@ jobs:
           set -euo pipefail
           export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_OPENVIKING="$OPENVIKING_VERSION"
           "$RUNNER_TEMP/wheel-venv/bin/python" setup.py bdist_wheel \
-            --plat-name android_24_arm64_v8a --dist-dir dist-android
+            --plat-name "android_${ANDROID_API_LEVEL}_arm64_v8a" --dist-dir dist-android
+
+      # Both producers use abi3 internally, but the real NDK extensions link
+      # versioned libpython. wheel tags rewrites filename, WHEEL and RECORD;
+      # this is not a manylinux relabel (the ELF checker below rejects glibc).
+      - name: Stamp honest exact-minor Android wheel tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="cp${TERMUX_PY_VERSION//./}"
+          for whl in dist-android/*.whl; do
+            "$RUNNER_TEMP/wheel-venv/bin/python" -m wheel tags \
+              --python-tag "$tag" --abi-tag "$tag" \
+              --platform-tag "android_${ANDROID_API_LEVEL}_arm64_v8a" --remove "$whl"
+          done
 
       - name: Inspect the wheels
         run: |
           set -euo pipefail
-          python3 scripts/build_support/android_native.py wheel-check --dist dist-android
+          python3 scripts/build_support/android_native.py wheel-check --dist dist-android \
+            --python-version "$TERMUX_PY_VERSION" --android-api "$ANDROID_API_LEVEL" \
+            --readelf "$NDK_BIN/llvm-readelf"
           for whl in dist-android/*.whl; do
             echo "== $whl"
             python3 -c "import sys, zipfile; print('\n'.join(sorted(zipfile.ZipFile(sys.argv[1]).namelist())))" "$whl"
@@ -372,7 +416,7 @@ jobs:
             --version "$OPENVIKING_VERSION" \
             --android-api "$ANDROID_API_LEVEL" \
             --ndk "$ANDROID_NDK_VERSION" \
-            --termux-python "$TERMUX_PY_VERSION"
+            --termux-python "$TERMUX_PY_VERSION" --readelf "$NDK_BIN/llvm-readelf"
 
       # Exercises the restore path the device will run, so a broken manifest or
       # checksum fails here instead of in Termux.
@@ -384,6 +428,26 @@ jobs:
             --root "$RUNNER_TEMP/restored" --ignore-arch
           diff <(cd "$RUNNER_TEMP/restored" && find openviking -type f | sort) \
                <(cd . && python3 -c "import sys; sys.path.insert(0, 'scripts/build_support'); import android_native; print('\n'.join(sorted(android_native.ARTIFACTS)))")
+
+      - name: Record toolchain and artifact checksums
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/wheel-venv/bin/python" -m scripts.build_support.android_target record \
+            --prefix "$TERMUX_PREFIX" \
+            --compiler "$NDK_BIN/aarch64-linux-android${ANDROID_API_LEVEL}-clang" \
+            --out dist-android/toolchain.json
+          "$RUNNER_TEMP/wheel-venv/bin/python" - <<'PY'
+          import importlib.metadata, json, os
+          from pathlib import Path
+          path = Path('dist-android/toolchain.json')
+          data = json.loads(path.read_text())
+          data['build_tools']['setuptools-scm'] = importlib.metadata.version('setuptools-scm')
+          data['cli'] = {key: os.environ[key] for key in (
+              'CLI_TARGET', 'CLI_ZIG_VERSION', 'CLI_ZIG_ARCHIVE_SHA256', 'CLI_CARGO_ZIGBUILD_VERSION')}
+          path.write_text(json.dumps(data, indent=2) + '\n')
+          PY
+          cp scripts/build_support/android_target.json dist-android/target-profile.json
+          (cd dist-android && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
 
       - name: Summarize
         shell: bash
@@ -399,9 +463,9 @@ jobs:
             sha256sum dist-android/*.whl dist-android/*.tar.gz
             echo '```'
             echo
-            echo "On Termux: \`pip install dist-android/openviking-*.whl --no-deps\`"
+            echo "Native component smoke only (not application acceptance): \`pip install dist-android/openviking-*.whl --no-deps\`"
             echo "(or \`python scripts/build_support/android_native.py install <bundle> --root . --force\`)."
-            echo "The artifacts link libpython$TERMUX_PY_VERSION, so the device needs Termux CPython $TERMUX_PY_VERSION (\`pkg upgrade python\`)."
+            echo "The artifacts require Termux CPython $TERMUX_PY_VERSION; use a matching interpreter/private runtime without changing system Python. Full installation requires the complete dependency wheelhouse."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7
@@ -411,7 +475,8 @@ jobs:
             dist-android/*.whl
             dist-android/*.tar.gz
             dist-android/*.sha256
-            dist-android/manifest.json
+            dist-android/*.json
+            dist-android/SHA256SUMS
           if-no-files-found: error
           retention-days: 30
 

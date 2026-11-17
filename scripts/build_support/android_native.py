@@ -31,11 +31,13 @@ import hashlib
 import json
 import os
 import platform
-import shutil
+import re
 import subprocess
 import sys
 import tarfile
+import tempfile
 import zipfile
+from email.parser import Parser
 from pathlib import Path
 
 CLI_ARTIFACT = "openviking/bin/ov"
@@ -68,7 +70,9 @@ GLIBC_MARKERS = (
 MACHINE_NAMES = {"aarch64", "arm64", "arm64-v8a"}
 MANIFEST_SCHEMA = 1
 
-# ``cp310-abi3`` is what setup.py/maturin emit for these artifacts.
+# Stable-API source does not imply abi3 wheel compatibility when DT_NEEDED
+# binds the extensions to one Termux CPython minor.
+DEFAULT_PYTHON_VERSION = "3.14"
 ANDROID_PLATFORM_TAG = "android_24_arm64_v8a"
 WHEEL_MODULE_PREFIX = "ragfs_python-"
 EM_AARCH64 = b"\xb7\x00"
@@ -115,12 +119,18 @@ def sha256_file(path: Path) -> str:
 
 
 def verify_artifact(
-    relative: str, root: Path, readelf: str = "readelf", python_version: str = ""
+    relative: str,
+    root: Path,
+    readelf: str = "readelf",
+    python_version: str = "",
+    *,
+    entry_point: str | None = None,
 ) -> dict[str, object]:
     """Check a single artifact and return a small summary dict."""
     path = root / relative
     if not path.is_file():
         raise VerificationError(f"missing artifact: {relative}")
+    entry_point = entry_point or MODULE_ENTRY_POINTS.get(relative)
     header = _readelf(["-h", str(path)], readelf)
     if "AArch64" not in header:
         raise VerificationError(f"{relative}: expected an AArch64 ELF, got:\n{header.strip()}")
@@ -128,6 +138,9 @@ def verify_artifact(
         raise VerificationError(f"{relative}: expected ELF64")
     if "EXEC" not in header and "DYN" not in header:
         raise VerificationError(f"{relative}: unexpected ELF type (need EXEC or DYN)")
+
+    if entry_point and "DYN" not in header:
+        raise VerificationError(f"{relative}: expected a shared ELF extension (DYN)")
 
     needed = needed_libraries(path, readelf)
     offenders = [
@@ -152,7 +165,7 @@ def verify_artifact(
                 f"{relative}: linked against {', '.join(unexpected)} but the bundle targets "
                 f"Termux CPython {python_version} ({expected})"
             )
-        if relative in MODULE_ENTRY_POINTS and expected not in libpython:
+        if entry_point and expected not in libpython:
             raise VerificationError(
                 f"{relative}: no DT_NEEDED {expected}; Android would fail to resolve the "
                 "stable-ABI symbols (build it against the Termux sysroot libpython)"
@@ -163,9 +176,17 @@ def verify_artifact(
             "accept a Termux-specific build"
         )
 
-    entry_point = MODULE_ENTRY_POINTS.get(relative)
-    if entry_point and entry_point not in dynamic_symbols(path, readelf):
-        raise VerificationError(f"{relative}: exported symbol {entry_point} not found")
+    if entry_point:
+        exported = any(
+            fields[-1].split("@", 1)[0] == entry_point
+            and "UND" not in fields
+            and "GLOBAL" in fields
+            and "DEFAULT" in fields
+            for line in dynamic_symbols(path, readelf).splitlines()
+            if (fields := line.split())
+        )
+        if not exported:
+            raise VerificationError(f"{relative}: exported symbol {entry_point} not found")
 
     return {
         "path": relative,
@@ -219,7 +240,11 @@ def bundle(
         "version": version,
         "platform": "android",
         "arch": "aarch64",
-        "abi": "cp310-abi3",
+        "abi": (
+            f"cp{python_version.replace('.', '')}-cp{python_version.replace('.', '')}"
+            if python_version
+            else "cp310-abi3"
+        ),
         "android_api": android_api,
         "ndk": ndk,
         "termux_python": python_version,
@@ -309,24 +334,66 @@ def _default_out_dir() -> Path:
 
 
 def _is_aarch64_elf(payload: bytes) -> bool:
-    return payload[:4] == b"\x7fELF" and payload[18:20] == EM_AARCH64
+    return (
+        len(payload) >= 64
+        and payload[:6] == b"\x7fELF\x02\x01"
+        and payload[18:20] == EM_AARCH64
+    )
 
 
-def wheel_check(dist: Path) -> list[str]:
-    """Assert the built wheels carry the Android tag and the native payloads."""
+def wheel_check(
+    dist: Path,
+    python_version: str | None = None,
+    android_api: str | None = None,
+    readelf: str = "readelf",
+) -> list[str]:
+    """Check exact-minor tags, internal metadata and every native extension.
+
+    Only the original native wheels belong in this directory. These checks do
+    not turn host/manylinux binaries into Android binaries: readelf must prove
+    the extensions are AArch64, bionic-compatible and linked to target Python.
+    """
+    python_version = (
+        python_version
+        if python_version is not None
+        else os.environ.get("TERMUX_PY_VERSION", DEFAULT_PYTHON_VERSION)
+    )
+    android_api = (
+        android_api if android_api is not None else os.environ.get("ANDROID_API_LEVEL", "24")
+    )
+    if not re.fullmatch(r"3\.[0-9]+", python_version):
+        raise VerificationError("expected a CPython minor version, e.g. 3.14")
+    if not re.fullmatch(r"[0-9]+", str(android_api)) or int(android_api) < 24:
+        raise VerificationError("expected an Android API level >= 24")
+    interpreter = f"cp{python_version.replace('.', '')}"
+    platform_tag = f"android_{android_api}_arm64_v8a"
+    expected_tag = f"{interpreter}-{interpreter}-{platform_tag}"
     wheels = sorted(dist.glob("*.whl"))
     if not wheels:
         raise VerificationError(f"no wheels under {dist}")
     checked: list[str] = []
     for wheel in wheels:
         name = wheel.name
-        if f"-{ANDROID_PLATFORM_TAG}.whl" not in name:
+        if not name.endswith(f"-{expected_tag}.whl"):
             raise VerificationError(
-                f"{name}: expected the {ANDROID_PLATFORM_TAG} platform tag "
-                "(Android/bionic); Termux would reject this wheel"
+                f"{name}: expected exact-minor {expected_tag} tag (Android/bionic); "
+                "abi3 is not portable across minors when linking versioned libpython"
             )
         with zipfile.ZipFile(wheel) as archive:
+            if corrupt := archive.testzip():
+                raise VerificationError(f"{name}: wheel CRC mismatch: {corrupt}")
             members = archive.namelist()
+            metadata = [
+                member for member in members
+                if member.endswith(".dist-info/WHEEL") and member.count("/") == 1
+            ]
+            if len(metadata) != 1:
+                raise VerificationError(
+                    f"{name}: expected exactly one internal WHEEL metadata file"
+                )
+            tags = Parser().parsestr(archive.read(metadata[0]).decode("utf-8")).get_all("Tag", [])
+            if tags != [expected_tag]:
+                raise VerificationError(f"{name}: internal WHEEL tags {tags} != {[expected_tag]}")
             if name.startswith("openviking-"):
                 # The package wheel has to carry all three native artifacts.
                 required = list(ARTIFACTS)
@@ -352,9 +419,28 @@ def wheel_check(dist: Path) -> list[str]:
                     )
             else:
                 required = []
-            for member in required:
-                if not _is_aarch64_elf(archive.read(member)):
-                    raise VerificationError(f"{name}: {member} is not an AArch64 ELF")
+            # The CLI is an ELF executable, not a Python module. Conversely,
+            # inspect *all* .so payloads, not only the two required extensions.
+            native = set(required) | {member for member in members if member.endswith(".so")}
+            with tempfile.TemporaryDirectory(prefix="android-wheel-") as directory:
+                root = Path(directory)
+                for index, member in enumerate(sorted(native)):
+                    payload = archive.read(member)
+                    if not _is_aarch64_elf(payload):
+                        raise VerificationError(f"{name}: {member} is not an AArch64 ELF")
+                    # Never extract paths supplied by a wheel into the filesystem.
+                    staged = f"payload-{index}"
+                    (root / staged).write_bytes(payload)
+                    entry_point = (
+                        f"PyInit_{Path(member).name.split('.', 1)[0]}"
+                        if member.endswith(".so") else None
+                    )
+                    try:
+                        verify_artifact(
+                            staged, root, readelf, python_version, entry_point=entry_point
+                        )
+                    except VerificationError as exc:
+                        raise VerificationError(f"{name}: {member}: {exc}") from exc
         checked.append(name)
     return checked
 
@@ -395,6 +481,13 @@ def main(argv: list[str] | None = None) -> int:
 
     wheel_parser = subparsers.add_parser("wheel-check", help="validate android wheels")
     wheel_parser.add_argument("--dist", type=Path, default=_default_out_dir())
+    wheel_parser.add_argument(
+        "--python-version", default=None, help="target minor (default: TERMUX_PY_VERSION or 3.14)"
+    )
+    wheel_parser.add_argument(
+        "--android-api", default=None, help="target API (default: ANDROID_API_LEVEL or 24)"
+    )
+    wheel_parser.add_argument("--readelf", default="readelf")
 
     args = parser.parse_args(argv)
     try:
@@ -417,7 +510,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[OK] sha256 {sha256_file(archive)}")
             return 0
         if args.command == "wheel-check":
-            for name in wheel_check(args.dist):
+            for name in wheel_check(args.dist, args.python_version, args.android_api, args.readelf):
                 print(f"[OK] wheel {name}")
             return 0
         installed = install(
