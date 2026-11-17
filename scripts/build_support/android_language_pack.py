@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import zipfile
 from pathlib import Path
 
 from scripts.build_support.android_parser_wheels import fetch_source, inspect_wheel, sha256, unpack_source
@@ -231,11 +232,18 @@ def main(argv=None):
     manifest = json.loads(args.manifest.read_text())
     if manifest.get("schema") != 1:
         parser.error("unsupported source manifest")
+    if args.cargo_lock and sha256(args.cargo_lock) != manifest["cargo_lock_sha256"]:
+        parser.error("Cargo lock does not match the independently pinned SHA256")
     if args.out.exists() and any(args.out.iterdir()):
         parser.error("output directory must be empty")
     wrapper = fetch_source(manifest["python_source"], args.cache)
     bundle = fetch_source(manifest["grammar_source"], args.cache)
     core = fetch_source(manifest["core_source"], args.cache)
+    integration = [fetch_source(source, args.cache) for source in manifest["integration_wheels"]]
+    for wheel in integration:
+        with zipfile.ZipFile(wheel) as archive:
+            if archive.testzip():
+                raise ValueError(f"integration wheel CRC mismatch: {wheel.name}")
     args.out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="android-language-pack-") as temporary:
         directory = Path(temporary)
@@ -270,6 +278,8 @@ def main(argv=None):
         result.update({"sources": manifest, "patches": patches,
                        "rustc": subprocess.check_output(["rustc", "-vV"], text=True)})
         (args.out / wheel.name).write_bytes(wheel.read_bytes())
+        for pure_wheel in integration:
+            shutil.copyfile(pure_wheel, args.out / pure_wheel.name)
         (args.out / "language-pack-build.json").write_text(json.dumps(result, indent=2) + "\n")
         shutil.copyfile(project / "Cargo.lock", args.out / "Cargo.lock")
     return 0

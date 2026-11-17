@@ -33,29 +33,40 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Test parser build helpers
-        run: python3 -m unittest discover -s tests/misc -p test_android_parser_wheels.py -v
+        run: python3 -m unittest discover -s tests/misc -p 'test_android*.py' -v
       - uses: astral-sh/setup-uv@v7
+      - name: Load reviewed target pins
+        run: |
+          python3 -m scripts.build_support.android_target env --out "$RUNNER_TEMP/android-target.env"
+          cat "$RUNNER_TEMP/android-target.env" >> "$GITHUB_ENV"
       - name: Extract target Termux Python
         run: |
           set -euo pipefail
           python3 scripts/build_support/termux_sysroot.py \
             --dest "$RUNNER_TEMP/termux-sysroot" --repo "$TERMUX_REPO" \
+            --python-version "$TERMUX_PY_VERSION_PIN" \
+            --expected-sha256 "$TERMUX_PYTHON_DEB_SHA256" \
             --write-env "$RUNNER_TEMP/termux-python.env"
           cat "$RUNNER_TEMP/termux-python.env" >> "$GITHUB_ENV"
       - name: Set up matching build Python and NDK
         run: |
           set -euo pipefail
-          uv python install "$TERMUX_PY_VERSION"
-          uv venv --python "$TERMUX_PY_VERSION" "$RUNNER_TEMP/parser-build"
+          uv python install "$ANDROID_BUILD_PYTHON"
+          uv venv --python "$ANDROID_BUILD_PYTHON" "$RUNNER_TEMP/parser-build"
           uv pip install --python "$RUNNER_TEMP/parser-build/bin/python" \
             'setuptools==84.2.1' 'wheel==0.48.0' 'build==1.6.1'
-          ndk="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-${ANDROID_NDK:-}}}"
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$sdk"
+          ndk="$sdk/ndk/$ANDROID_NDK_REVISION"
+          if [[ ! -d "$ndk" ]]; then
+            sdkmanager --install "ndk;$ANDROID_NDK_REVISION"
+          fi
           test -d "$ndk"
           ndk_bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
           test -x "$ndk_bin/aarch64-linux-android${ANDROID_API_LEVEL}-clang"
           {
             echo "NDK_BIN=$ndk_bin"
-            echo "NDK_VERSION=$(basename "$ndk")"
+            echo "NDK_VERSION=$(awk -F'= ' '/^Pkg.Revision/ {print $2}' "$ndk/source.properties")"
           } >> "$GITHUB_ENV"
       - name: Build and inspect all pinned parser wheels
         run: |
@@ -70,10 +81,14 @@ jobs:
       - name: Include provenance and device smoke test
         run: |
           set -euo pipefail
+          "$RUNNER_TEMP/parser-build/bin/python" -m scripts.build_support.android_target record \
+            --prefix "$TERMUX_PREFIX" \
+            --compiler "$NDK_BIN/aarch64-linux-android${ANDROID_API_LEVEL}-clang" \
+            --out dist-android-parsers/toolchain.json
           cp scripts/build_support/android_parser_sources.json dist-android-parsers/source-manifest.json
           cp scripts/build_support/android_parser_smoke.py dist-android-parsers/
           cp docs/en/guides/android-distribution.md dist-android-parsers/README.md
-          (cd dist-android-parsers && sha256sum *.whl > SHA256SUMS)
+          (cd dist-android-parsers && sha256sum *.whl *.json *.py *.md > SHA256SUMS)
           {
             echo "### Android standalone parser dependency wheels"
             echo "- Termux Python $TERMUX_PY_VERSION; Android API $ANDROID_API_LEVEL"

@@ -239,15 +239,24 @@ def main(argv=None):
             parser.error(f"unknown packages: {sorted(unknown)}")
         sources = [item for item in sources if item["name"] in args.packages]
     args.out.mkdir(parents=True, exist_ok=True)
-    results = []
-    for source in sources:
-        print(f"Building {source['name']}=={source['version']}", flush=True)
-        results.append(build_one(source, args.target_prefix.resolve(), args.python_version,
-                                 args.android_api, args.cc, args.cache, args.out, args.readelf))
-        (args.out / "parser-wheels.json").write_text(json.dumps({
+    if any(args.out.iterdir()):
+        parser.error("output directory must be empty")
+    # Keep the whole batch private, on the output filesystem. A failed build
+    # leaves no wheels or completion manifest behind, and replacing the empty
+    # output directory publishes the complete batch atomically.
+    with tempfile.TemporaryDirectory(prefix=".android-parser-", dir=args.out.parent) as temporary:
+        staged = Path(temporary) / "wheels"
+        staged.mkdir()
+        results = []
+        for source in sources:
+            print(f"Building {source['name']}=={source['version']}", flush=True)
+            results.append(build_one(source, args.target_prefix.resolve(), args.python_version,
+                                     args.android_api, args.cc, args.cache, staged, args.readelf))
+        (staged / "parser-wheels.json").write_text(json.dumps({
             "schema": 1, "python": args.python_version, "android_api": args.android_api,
             "wheels": results,
         }, indent=2) + "\n")
+        os.replace(staged, args.out)
     return 0
 
 

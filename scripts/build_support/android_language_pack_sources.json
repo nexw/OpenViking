@@ -133,5 +133,22 @@
     "filename": "tree-sitter-language-pack-1.13.3.crate",
     "url": "https://static.crates.io/crates/tree-sitter-language-pack/tree-sitter-language-pack-1.13.3.crate",
     "sha256": "345ee6dd864ca9f9e846120d5546082a27e946e1b129a55e7c6d4b1fc5cddec3"
-  }
+  },
+  "cargo_lock_sha256": "9aaa80acfba3e6f12d19215a6643ae9f392a8e328d3159be84a2832b8263ee83",
+  "integration_wheels": [
+    {
+      "name": "grep-ast",
+      "version": "0.9.0",
+      "filename": "grep_ast-0.9.0-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/40/79/29f1373b2ce1eec37c03aefbc17194c2470d8b61ede288e5043231825999/grep_ast-0.9.0-py3-none-any.whl",
+      "sha256": "a3973dca99f1abc026a01bbbc70e00a63860c8ff94a56182ff18b089836826d7"
+    },
+    {
+      "name": "pathspec",
+      "version": "1.1.1",
+      "filename": "pathspec-1.1.1-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl",
+      "sha256": "a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189"
+    }
+  ]
 }

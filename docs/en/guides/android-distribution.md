@@ -47,7 +47,17 @@ python scripts/build_support/android_parser_wheels.py \
 
 For a hosted cross-build, `--cc` is the NDK's
 `aarch64-linux-android24-clang`, `AR` is its `llvm-ar`, and `--readelf` can point to
-`llvm-readelf`. The workflow obtains the target prefix from a Termux Python deb.
+`llvm-readelf`. Output directories must be empty; failed batches do not publish
+partial wheelhouses or a completion manifest.
+
+The hosted workflows use `scripts/build_support/android_target.json`: CPython
+3.14.10, its independently pinned Termux deb SHA256, NDK 30.0.16248370, and (for
+Rust extensions) Rust 1.100.0. The target deb is verified **before** extraction or
+executing its sysconfig. Mirror/package changes fail closed; update the reviewed
+pins intentionally rather than silently selecting new toolchains. Downloadable
+`toolchain.json` records the source commit, resolved package/deb hash, target
+sysconfig/libpython hashes, compiler, interpreter and installed build-tool
+versions. SHA256SUMS also covers metadata and the device smoke scripts.
 
 ### Device acceptance test
 
@@ -60,7 +70,7 @@ python -m pip install --no-index --only-binary=:all: --find-links . tree-sitter 
   tree-sitter-python tree-sitter-javascript tree-sitter-typescript \
   tree-sitter-java tree-sitter-cpp tree-sitter-rust tree-sitter-go \
   tree-sitter-c-sharp tree-sitter-php tree-sitter-lua
-python android_parser_smoke.py
+python android_parser_smoke.py --manifest source-manifest.json --output parser-smoke.json
 ```
 
 Ensure the matching Termux libpython can be found by the dynamic linker. For a
@@ -86,7 +96,7 @@ lockfile: remaining dependency/build versions must be pinned for a release.
 Remaining source-build groups include:
 
 - Rust: orjson, pydantic-core, jiter, rpds-py, fastuuid, tiktoken, tokenizers,
-  hf-xet, firecrawl-anydoc, frostwork, LiteLLM itself, and language-pack.
+  hf-xet, firecrawl-anydoc, frostwork, and LiteLLM itself.
 - C/C++: grpcio, lxml, Pillow, CFFI, pycares, argon2 bindings, cryptography,
   pycryptodome, brotli, regex, zope-interface, PyYAML and RapidFuzz.
   Some have supported pure-Python build modes or genuine Termux package recipes;
@@ -105,23 +115,54 @@ and grep-ast integration. Installing the standalone grammars does not replace
 this API. Its default downloader maps Android to Linux/aarch64, whose grammar
 libraries cannot be used with bionic.
 
-The first prototype should preserve its real API and build a bounded grammar
-set into the extension with upstream `TSLP_LINK_MODE=static` and an explicit
-`TSLP_LANGUAGES` list. Pin and verify upstream's parser source bundle, use a local
-source URL, disable downloads, and test both supported and unsupported languages
-offline. The opt-in `Android Offline Language Pack` workflow prototypes this
-stage. It uses exact source/grammar hashes, an explicit embedded set, and Cargo
+The opt-in `Android Offline Language Pack` workflow builds eleven embedded
+languages: Python, JavaScript, TypeScript, TSX, Java, C++, Rust, Go, C#, PHP and
+Lua. It uses upstream `TSLP_LINK_MODE=static` and an explicit `TSLP_LANGUAGES`
+list with a checksum-verified local source bundle. It uses exact source/grammar hashes, an explicit embedded set, and Cargo
 features that remove both the runtime downloader and dynamic grammar loading.
 Its real `process()` and offline `prefetch()` implementations remain upstream
 code; download/cache/configuration APIs explicitly raise errors rather than
 pretend to succeed. OpenViking's optional cache-configuration call already
 handles that error. Unsupported languages must also fail promptly.
 
-Initial verification can explicitly resolve and archive the Cargo workspace
-lockfile (`--resolve-lock`); repeatable builds must reuse its verified
-`--cargo-lock` input. Source grammar notices and resolved Rust dependency notices
-are included inside the wheel. This stage has not yet passed an Android
-build/runtime acceptance test.
+The workflow uses the checked-in, independently hashed Cargo workspace lock
+with `--locked`. `--resolve-lock` exists only for explicit prototype/update work.
+Grammar notices and resolved Rust dependency notices are included inside the
+wheel. Pure `grep-ast==0.9.0` and `pathspec==1.1.1` wheels are mirrored with
+pinned hashes for the optional integration test.
+
+Device acceptance caught an upstream C++ defect: function names nested inside
+declarator nodes were missing from `process().structure`. The builder applies
+a guarded, recorded patch to the exact checksum-pinned core crate; it does not
+replace `process()` with a Python shim or weaken the assertion. Tests cover
+ordinary functions, pointer-return functions and namespace-nested functions.
+
+A real hosted NDK build and Termux CPython 3.14.10 acceptance passed all eleven
+languages, structure/import extraction, real `prefetch()`, and excluded-language
+failures, without LD_PRELOAD:
+https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44026271032
+The same artifact also passed real grep-ast `TreeContext` integration with a
+process-local seccomp filter denying network syscalls, including native Rust
+network calls. This remains a **parser-component** test, not application/service
+acceptance.
+
+From the language-pack artifact directory, with the standalone parser wheelhouse
+available and a fresh matching venv:
+
+```sh
+sha256sum -c SHA256SUMS
+python -m pip install --no-index --only-binary=:all: \\
+  --find-links . --find-links /path/to/parser-wheelhouse \\
+  tree-sitter-language-pack==1.13.3 grep-ast==0.9.0
+python android_language_pack_smoke.py --grep-ast --deny-network \\
+  --output language-pack-smoke.json
+```
+
+`--deny-network` only tightens this test process's Android/aarch64 seccomp
+policy. It verifies socket creation returns EPERM; unsupported kernels fail the
+requested test explicitly instead of silently skipping enforcement. The normal
+smoke test can also run without that flag. No system Python or global loader
+configuration needs to be changed.
 
 ## Full-distribution acceptance criteria
 
