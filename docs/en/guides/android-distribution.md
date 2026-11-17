@@ -67,9 +67,13 @@ Ensure the matching Termux libpython can be found by the dynamic linker. For a
 privately extracted interpreter, use a process-local library search path; do not
 replace the device's system Python or preload a different Python minor.
 
-The local prototype passed all 12 actual parse variants (including TSX and both
-PHP variants) in a fresh private CPython 3.14.10 venv, with no LD_PRELOAD. This is
-**not** a test of language-pack or the complete OpenViking service.
+Both the local prototype and the real hosted-NDK artifacts passed all 12 actual
+parse variants (including TSX and both PHP variants) in a fresh private CPython
+3.14.10 venv, with no LD_PRELOAD. Hosted run:
+https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44020777022
+The downloaded artifact's SHA256SUMS were verified before offline binary-only
+installation and device tests. This is **not** a test of language-pack or the
+complete OpenViking service.
 
 ## Stage 2: language-pack and the remaining binary closure
 
