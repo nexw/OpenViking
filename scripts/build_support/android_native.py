@@ -7,10 +7,10 @@ The three artifacts below are the ones ``setup.py`` normally produces locally
 * ``openviking/lib/ragfs_python.abi3.so``               - PyO3 RAGFS binding
 * ``openviking/storage/vectordb/engine/_native.abi3.so`` - C++ vectordb engine
 
-All of them are stable-ABI (``Py_LIMITED_API`` >= 3.10) so one build serves every
-CPython Termux ships, but they must be linked against bionic - a manylinux build
-is rejected by Android's linker. ``verify`` enforces exactly that, which is what
-makes a cross-built bundle safe to publish.
+The extensions use the stable API (``Py_LIMITED_API`` >= 3.10), but these Android
+builds link Termux's versioned libpython and require that CPython minor version
+on the device. The CLI is static musl; the extensions must use bionic rather than
+glibc. ``verify`` checks ELF structure and dependencies, not runtime imports.
 
 Typical CI usage::
 
@@ -50,10 +50,10 @@ MODULE_ENTRY_POINTS = {
     ENGINE_ARTIFACT: "PyInit__native",
 }
 
-# Anything in this list means the file was linked against glibc/CPython's own
-# dynamic library instead of bionic, i.e. it cannot load inside Termux.
+# Anything in this list means the file was linked against glibc, i.e. it cannot
+# load inside Termux. libpython is handled separately: PyO3 always links it for
+# Android targets, and the NDK's -Wl,--no-undefined effectively requires it.
 GLIBC_MARKERS = (
-    "libpython",
     "ld-linux",
     "libc.so.6",
     "libm.so.6",
@@ -70,10 +70,7 @@ MANIFEST_SCHEMA = 1
 
 # ``cp310-abi3`` is what setup.py/maturin emit for these artifacts.
 ANDROID_PLATFORM_TAG = "android_24_arm64_v8a"
-WHEEL_REQUIRED_MEMBERS = {
-    "openviking-": (*ARTIFACTS,),  # full package wheel bundles all three
-    "ragfs_python-": ("ragfs_python.abi3.so",),
-}
+WHEEL_MODULE_PREFIX = "ragfs_python-"
 EM_AARCH64 = b"\xb7\x00"
 
 
@@ -117,7 +114,9 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def verify_artifact(relative: str, root: Path, readelf: str = "readelf") -> dict[str, object]:
+def verify_artifact(
+    relative: str, root: Path, readelf: str = "readelf", python_version: str = ""
+) -> dict[str, object]:
     """Check a single artifact and return a small summary dict."""
     path = root / relative
     if not path.is_file():
@@ -142,6 +141,28 @@ def verify_artifact(relative: str, root: Path, readelf: str = "readelf") -> dict
             "build it with the Android NDK instead of the host toolchain"
         )
 
+    # Extensions must link the Termux libpython: Android's linker resolves a
+    # stable-ABI module's Py* symbols only through its own DT_NEEDED entry.
+    libpython = [library for library in needed if library.startswith("libpython")]
+    if python_version:
+        expected = f"libpython{python_version}.so"
+        unexpected = [library for library in libpython if library != expected]
+        if unexpected:
+            raise VerificationError(
+                f"{relative}: linked against {', '.join(unexpected)} but the bundle targets "
+                f"Termux CPython {python_version} ({expected})"
+            )
+        if relative in MODULE_ENTRY_POINTS and expected not in libpython:
+            raise VerificationError(
+                f"{relative}: no DT_NEEDED {expected}; Android would fail to resolve the "
+                "stable-ABI symbols (build it against the Termux sysroot libpython)"
+            )
+    elif libpython:
+        raise VerificationError(
+            f"{relative}: linked against {', '.join(libpython)}; pass --python-version to "
+            "accept a Termux-specific build"
+        )
+
     entry_point = MODULE_ENTRY_POINTS.get(relative)
     if entry_point and entry_point not in dynamic_symbols(path, readelf):
         raise VerificationError(f"{relative}: exported symbol {entry_point} not found")
@@ -154,8 +175,12 @@ def verify_artifact(relative: str, root: Path, readelf: str = "readelf") -> dict
     }
 
 
-def verify(root: Path, readelf: str = "readelf") -> list[dict[str, object]]:
-    return [verify_artifact(relative, root, readelf) for relative in ARTIFACTS]
+def verify(
+    root: Path, readelf: str = "readelf", python_version: str = ""
+) -> list[dict[str, object]]:
+    return [
+        verify_artifact(relative, root, readelf, python_version) for relative in ARTIFACTS
+    ]
 
 
 def git_commit(root: Path) -> str:
@@ -182,7 +207,7 @@ def bundle(
     readelf: str = "readelf",
 ) -> Path:
     """Verify the artifacts and pack them with a manifest next to the archive."""
-    summary = verify(root, readelf)
+    summary = verify(root, readelf, python_version)
     out_dir.mkdir(parents=True, exist_ok=True)
     suffix = f"-{version}" if version else ""
     archive = out_dir / f"openviking-native-android-aarch64{suffix}.tar.gz"
@@ -301,18 +326,33 @@ def wheel_check(dist: Path) -> list[str]:
                 "(Android/bionic); Termux would reject this wheel"
             )
         with zipfile.ZipFile(wheel) as archive:
-            members = set(archive.namelist())
-            required = next(
-                (
-                    value
-                    for prefix, value in WHEEL_REQUIRED_MEMBERS.items()
-                    if name.startswith(prefix)
-                ),
-                (),
-            )
+            members = archive.namelist()
+            if name.startswith("openviking-"):
+                # The package wheel has to carry all three native artifacts.
+                required = list(ARTIFACTS)
+                missing = [member for member in required if member not in members]
+                if missing:
+                    raise VerificationError(
+                        f"{name}: missing wheel members {missing}; wheel has {sorted(members)}"
+                    )
+            elif name.startswith(WHEEL_MODULE_PREFIX):
+                # maturin supports both a top-level extension and a package
+                # containing __init__.py plus ragfs_python/ragfs_python.abi3.so.
+                required = [
+                    member
+                    for member in members
+                    if Path(member).parent.as_posix() in (".", "ragfs_python")
+                    and Path(member).name.startswith("ragfs_python.")
+                    and member.endswith(".so")
+                ]
+                if not required:
+                    raise VerificationError(
+                        f"{name}: no ragfs_python extension at the wheel root or in "
+                        f"ragfs_python/; wheel has {sorted(members)}"
+                    )
+            else:
+                required = []
             for member in required:
-                if member not in members:
-                    raise VerificationError(f"{name}: missing wheel member {member}")
                 if not _is_aarch64_elf(archive.read(member)):
                     raise VerificationError(f"{name}: {member} is not an AArch64 ELF")
         checked.append(name)
@@ -326,6 +366,11 @@ def main(argv: list[str] | None = None) -> int:
     verify_parser = subparsers.add_parser("verify", help="check the three native artifacts")
     verify_parser.add_argument("--root", type=Path, default=Path.cwd())
     verify_parser.add_argument("--readelf", default="readelf")
+    verify_parser.add_argument(
+        "--python-version",
+        default=os.environ.get("TERMUX_PY_VERSION", ""),
+        help="Termux CPython minor version the artifacts must link (e.g. 3.14)",
+    )
 
     bundle_parser = subparsers.add_parser("bundle", help="verify then pack a runtime tarball")
     bundle_parser.add_argument("--root", type=Path, default=Path.cwd())
@@ -354,7 +399,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "verify":
-            for item in verify(args.root, args.readelf):
+            for item in verify(args.root, args.readelf, args.python_version):
                 needed = ", ".join(item["needed"]) or "(none)"
                 print(f"[OK] {item['path']} ({item['size']} bytes) NEEDED: {needed}")
             return 0
@@ -386,10 +431,9 @@ def main(argv: list[str] | None = None) -> int:
     for relative in installed:
         print(f"  {relative}")
     print(
-        "\nTermux note: stable-ABI modules carry no DT_NEEDED libpython, and Android's "
-        "linker scopes libpython locally, so export the shared library before importing:\n"
-        "  export LD_PRELOAD=$PREFIX/lib/libpython$(python -c "
-        "'import sys;print(f\"{sys.version_info.major}.{sys.version_info.minor}\")').so"
+        "\nTermux note: these artifacts link Termux's libpython, so the device needs the "
+        "same CPython minor version that produced them (check the manifest's termux_python). "
+        "Run `pkg upgrade python` if the import fails with 'library libpython3.X.so not found'."
     )
     return 0
 

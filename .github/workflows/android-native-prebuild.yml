@@ -8,10 +8,9 @@ name: Android Native Prebuild
 #   openviking/storage/vectordb/engine/_native.abi3.so C++ vectordb engine
 #
 # Why an NDK cross build and not the regular `_build.yml` wheel jobs: the two
-# extensions are stable-ABI (Py_LIMITED_API >= 3.10), so one build serves every
-# CPython Termux ships, but they must be linked against bionic. A manylinux/
-# glibc artifact is rejected by Android's linker ("cannot locate symbol
-# PyLong_Type") — and so is any other platform's prebuilt wheel.
+# extensions use the stable API (Py_LIMITED_API >= 3.10), but must link bionic
+# and the selected Termux libpython. They require that CPython minor version on
+# the device despite the abi3 tag. A manylinux/glibc extension cannot load here.
 #
 # Outputs, all tagged `...android_24_arm64_v8a` so Termux's pip/uv accepts them:
 #   openviking-<ver>-cp310-abi3-android_24_arm64_v8a.whl    full package wheel
@@ -25,8 +24,10 @@ name: Android Native Prebuild
 #   # or, for a source checkout:
 #   python scripts/build_support/android_native.py install \
 #       openviking-native-android-aarch64-<version>.tar.gz --root . --force
-#   export LD_PRELOAD=$PREFIX/lib/libpython3.14.so   # stable-ABI modules rely on
-#                                                    # the process-wide libpython
+# Both extensions link Termux's libpython (PyO3 does that for Android targets and
+# the NDK's -Wl,--no-undefined needs it), so the device must run the same CPython
+# minor version: run `pkg upgrade python` if an import reports a missing
+# libpython3.X.so.
 #
 # Only hosted runners are used (see tests/misc/test_linux_runner.py): the NDK
 # cross-compiles aarch64 from x86_64, so no self-hosted pool is involved.
@@ -42,6 +43,10 @@ on:
         description: 'Termux apt repository providing bionic CPython headers'
         required: false
         default: 'https://packages.termux.dev/apt/termux-main'
+      termux_python_version:
+        description: 'Pin the Termux CPython minor version (e.g. 3.13; default: newest)'
+        required: false
+        default: ''
       version:
         description: 'Override the version stamped into ov (default: resolve from git)'
         required: false
@@ -56,6 +61,10 @@ on:
         type: string
         required: false
         default: 'https://packages.termux.dev/apt/termux-main'
+      termux_python_version:
+        type: string
+        required: false
+        default: ''
       version:
         type: string
         required: false
@@ -79,15 +88,32 @@ jobs:
     env:
       ANDROID_API_LEVEL: ${{ inputs.android_api_level || '24' }}
       TERMUX_REPO: ${{ inputs.termux_repo || 'https://packages.termux.dev/apt/termux-main' }}
-      RUST_TARGET: aarch64-linux-android
-      TERMUX_ENV_FILE: ${{ runner.temp }}/termux-sysroot.env
+      # Empty = newest python in the Termux repo. The extensions link that
+      # libpython, so pin this when a device is still on an older CPython.
+      TERMUX_PY_VERSION_PIN: ${{ inputs.termux_python_version || '' }}
+      # Extensions must be bionic, so they are NDK cross builds.
+      PY_TARGET: aarch64-linux-android
+      # The CLI is shipped as a fully static musl binary: `machine-uid`
+      # (a CLI dependency) has no android implementation, and a static
+      # musl binary runs in Termux anyway - this matches the official
+      # `@openviking/cli-linux-arm64` artifact.
+      CLI_TARGET: aarch64-unknown-linux-musl
       # ccache is picked up by Cargo (cc-rs) and by the CMake build below.
       CCACHE_MAXSIZE: 512M
+      # Stable-ABI extensions deliberately leave Py* undefined and let the
+      # interpreter provide them at dlopen time. glibc's ld allows that, but the
+      # NDK's clang wrapper passes -Wl,--no-undefined, so the unresolved-symbol
+      # check has to be relaxed for every cargo link against this target.
+      CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS: >-
+        -Clink-arg=-Wl,--unresolved-symbols=ignore-all
     steps:
       - uses: actions/checkout@v6
         with:
           # setuptools_scm derives the version from tags.
           fetch-depth: 0
+
+      - name: Test Android packaging helpers
+        run: python3 -m unittest discover -s tests/misc -p test_android_native.py -v
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -104,8 +130,9 @@ jobs:
           python3 scripts/build_support/termux_sysroot.py \
             --dest "$RUNNER_TEMP/termux-sysroot" \
             --repo "$TERMUX_REPO" \
-            --write-env "$TERMUX_ENV_FILE"
-          cat "$TERMUX_ENV_FILE" >> "$GITHUB_ENV"
+            --python-version "$TERMUX_PY_VERSION_PIN" \
+            --write-env "$RUNNER_TEMP/termux-sysroot.env"
+          cat "$RUNNER_TEMP/termux-sysroot.env" >> "$GITHUB_ENV"
 
       # CMake's FindPython3 rejects an interpreter whose minor version differs
       # from the headers/libpython it was given, so the host interpreter must
@@ -149,14 +176,14 @@ jobs:
         run: |
           set -euo pipefail
           cc="$NDK_BIN/aarch64-linux-android${ANDROID_API_LEVEL}-clang"
-          api_def="-D__ANDROID_API__=${ANDROID_API_LEVEL}"
+          # No CFLAGS/CXXFLAGS: the NDK's <triple><api>-clang wrapper already
+          # defines __ANDROID_API__, and passing it again makes crates that
+          # compile with -Werror (aws-lc-sys) fail on -Wmacro-redefined.
           {
             echo "CC_aarch64_linux_android=$cc"
             echo "CXX_aarch64_linux_android=${cc}++"
             echo "AR_aarch64_linux_android=$NDK_BIN/llvm-ar"
             echo "RANLIB_aarch64_linux_android=$NDK_BIN/llvm-ranlib"
-            echo "CFLAGS_aarch64_linux_android=$api_def"
-            echo "CXXFLAGS_aarch64_linux_android=$api_def"
             echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$cc"
           } >> "$GITHUB_ENV"
 
@@ -164,7 +191,7 @@ jobs:
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-          targets: aarch64-linux-android
+          targets: aarch64-linux-android,aarch64-unknown-linux-musl
 
       - uses: ./.github/actions/compiler-cache
         with:
@@ -188,42 +215,53 @@ jobs:
           echo "OPENVIKING_VERSION=$version" >> "$GITHUB_ENV"
           echo "Resolved OpenViking version: $version"
 
-      # ov_cli links reqwest+rustls, so no OpenSSL is needed; every C dependency
-      # (ring, aws-lc, vendored sqlite/openssl from ragfs) is compiled by cc-rs
-      # with the NDK clang configured above.
-      - name: Build ov CLI
-        run: cargo build --release --locked --target "$RUST_TARGET" -p ov_cli
+      # A static musl binary: `machine-uid` has no android implementation, so
+      # `aarch64-linux-android` cannot build this crate, and Termux runs static
+      # musl binaries natively (that is what `@openviking/cli-linux-arm64`
+      # ships). Zig supplies the musl C cross compiler that cc-rs needs for ring
+      # and the vendored C dependencies, exactly as rust-cli.yml does it.
+      - name: Build ov CLI (static musl)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIG_VERSION=0.13.0
+          zig_dir="$RUNNER_TEMP/zig-$ZIG_VERSION"
+          if [[ ! -x "$zig_dir/zig" ]]; then
+            mkdir -p "$zig_dir"
+            curl -fsSL "https://ziglang.org/download/$ZIG_VERSION/zig-linux-x86_64-$ZIG_VERSION.tar.xz" \
+              | tar -xJ --strip-components=1 -C "$zig_dir"
+          fi
+          # $GITHUB_PATH only affects later steps, so extend PATH here as well.
+          export PATH="$zig_dir:$PATH"
+          zig version
+          if ! command -v cargo-zigbuild >/dev/null; then
+            cargo install --locked cargo-zigbuild
+          fi
+          cargo zigbuild --release --locked --target "$CLI_TARGET" -p ov_cli
 
       - name: Stage ov CLI
         run: |
           set -euo pipefail
           mkdir -p openviking/bin
-          cp "target/$RUST_TARGET/release/ov" openviking/bin/ov
+          cp "target/$CLI_TARGET/release/ov" openviking/bin/ov
           chmod +x openviking/bin/ov
 
-      # PyO3 cannot probe a target interpreter, but abi3 makes every probe
-      # unnecessary: the version comes from Cargo's `abi3-py310` feature.
-      # PYO3_NO_PYTHON is the documented fallback if the cross layout of the
-      # extracted Termux prefix is not recognised.
+      # PyO3 always links libpython for Android targets
+      # (pyo3_build_config::is_linking_libpython_for_target), which is exactly what
+      # Android's linker needs: a stable-ABI module only resolves its Py* symbols
+      # through its own DT_NEEDED entry. PYO3_CROSS_LIB_DIR therefore points at the
+      # extracted Termux prefix so the correct libpython3.X.so is recorded.
       - name: Build ragfs-python (PyO3 abi3)
         shell: bash
-        env:
-          PYO3_CROSS: '1'
         run: |
           set -euo pipefail
-          # Exported in the shell, not via `${{ env.* }}`: these come from
-          # $GITHUB_ENV, which expression evaluation cannot see.
+          export PYO3_CROSS=1
           export PYO3_CROSS_PYTHON_VERSION="$TERMUX_PY_VERSION"
           export PYO3_CROSS_LIB_DIR="$TERMUX_PREFIX/lib"
-          if ! cargo build --release --locked --target "$RUST_TARGET" -p ragfs-python; then
-            echo '::warning::PyO3 cross layout rejected, retrying with PYO3_NO_PYTHON=1'
-            env -u PYO3_CROSS -u PYO3_CROSS_LIB_DIR -u PYO3_CROSS_PYTHON_VERSION \
-              PYO3_NO_PYTHON=1 \
-              cargo build --release --locked --target "$RUST_TARGET" -p ragfs-python
-          fi
+          cargo build --release --locked --target "$PY_TARGET" -p ragfs-python
           mkdir -p openviking/lib
           rm -f openviking/lib/ragfs_python*.so
-          cp "target/$RUST_TARGET/release/libragfs_python.so" \
+          cp "target/$PY_TARGET/release/libragfs_python.so" \
              openviking/lib/ragfs_python.abi3.so
           chmod +x openviking/lib/ragfs_python.abi3.so
 
@@ -231,6 +269,10 @@ jobs:
       # stages above are not rebuilt. `ANDROID_STL=c++_static` keeps the module
       # free of a libc++_shared.so dependency (Termux ships it, but a wheel that
       # does not need it is one less way to fail).
+      #
+      # The module links the Termux libpython explicitly (--no-as-needed keeps the
+      # DT_NEEDED entry): the NDK's clang wrapper passes -Wl,--no-undefined and
+      # Android resolves the stable-ABI Py* symbols only through that entry.
       - name: Build the C++ vectordb engine (abi3)
         shell: bash
         run: |
@@ -244,6 +286,7 @@ jobs:
             -DANDROID_PLATFORM="android-$ANDROID_API_LEVEL" \
             -DANDROID_STL=c++_static \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_MODULE_LINKER_FLAGS="-L$TERMUX_PREFIX/lib -Wl,--no-as-needed -lpython$TERMUX_PY_VERSION" \
             -DOV_PY_OUTPUT_DIR="$engine_dir" \
             -DOV_PY_EXT_SUFFIX=.abi3.so \
             -DPython3_FIND_STRATEGY=LOCATION \
@@ -255,9 +298,11 @@ jobs:
           cmake --build build/android-aarch64 --config Release -j"$(nproc)"
 
       # Fails when an artifact is missing, is not AArch64, was linked against
-      # glibc/libpython, or does not export its PyInit_ symbol.
+      # glibc/the wrong libpython, or does not export its PyInit_ symbol.
       - name: Verify the native artifacts
-        run: python3 scripts/build_support/android_native.py verify --root .
+        run: |
+          python3 scripts/build_support/android_native.py verify --root . \
+            --python-version "$TERMUX_PY_VERSION"
 
       # Studio is optional: the server works without the /studio bundle, so a
       # Vite failure must not block the native artifacts.
@@ -286,12 +331,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export PYO3_CROSS=1
           export PYO3_CROSS_PYTHON_VERSION="$TERMUX_PY_VERSION"
           export PYO3_CROSS_LIB_DIR="$TERMUX_PREFIX/lib"
           mkdir -p dist-android
           cd crates/ragfs-python
           "$RUNNER_TEMP/wheel-venv/bin/maturin" build --release --locked \
-            --target "$RUST_TARGET" --out "$GITHUB_WORKSPACE/dist-android"
+            --target "$PY_TARGET" --out "$GITHUB_WORKSPACE/dist-android"
 
       # Reuses the cross-built artifacts: every native stage of setup.py is
       # skipped, and package_data ships bin/ov, lib/ragfs_python*.so and
@@ -310,7 +356,13 @@ jobs:
             --plat-name android_24_arm64_v8a --dist-dir dist-android
 
       - name: Inspect the wheels
-        run: python3 scripts/build_support/android_native.py wheel-check --dist dist-android
+        run: |
+          set -euo pipefail
+          python3 scripts/build_support/android_native.py wheel-check --dist dist-android
+          for whl in dist-android/*.whl; do
+            echo "== $whl"
+            python3 -c "import sys, zipfile; print('\n'.join(sorted(zipfile.ZipFile(sys.argv[1]).namelist())))" "$whl"
+          done
 
       - name: Package the runtime bundle
         run: |
@@ -348,8 +400,8 @@ jobs:
             echo '```'
             echo
             echo "On Termux: \`pip install dist-android/openviking-*.whl --no-deps\`"
-            echo "(or \`python scripts/build_support/android_native.py install <bundle> --root . --force\`),"
-            echo "then \`export LD_PRELOAD=\$PREFIX/lib/libpython$TERMUX_PY_VERSION.so\` before importing."
+            echo "(or \`python scripts/build_support/android_native.py install <bundle> --root . --force\`)."
+            echo "The artifacts link libpython$TERMUX_PY_VERSION, so the device needs Termux CPython $TERMUX_PY_VERSION (\`pkg upgrade python\`)."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7
