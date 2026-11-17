@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 from pathlib import Path
 
@@ -86,6 +87,42 @@ def patch_offline(project: Path) -> dict:
         "patched_cargo_sha256": sha256(cargo),
         "cargo_lock_sha256": sha256(project / "Cargo.lock"),
     }
+
+
+def patch_cpp_names(project: Path, archive: Path) -> dict:
+    """Fix upstream's missed C/C++ nested declarators, caught by device tests."""
+    vendor = project / "vendor"
+    with tarfile.open(archive) as tar:
+        tar.extractall(vendor, filter="data")
+    core = vendor / "tree-sitter-language-pack-1.13.3"
+    source = core / "src/intel/intelligence.rs"
+    text = source.read_text()
+    marker = '    for target_kind in &["type_identifier", "identifier", "scoped_identifier"] {'
+    if text.count(marker) != 1:
+        raise ValueError("upstream structure-name resolution changed; review C++ patch")
+    patch = '''    // Termux device acceptance caught unnamed C/C++ function definitions:
+    // their identifier is nested under one or more declarator fields.
+    if let Some(declarator) = node.child_by_field_name("declarator") {
+        let name = if matches!(declarator.kind(), "identifier" | "field_identifier"
+            | "operator_name" | "destructor_name") {
+            Some(node_text(&declarator, source).to_string())
+        } else {
+            resolve_structure_name(&declarator, source)
+        };
+        if let Some(name) = name.filter(|name| !name.is_empty()) {
+            return Some(name);
+        }
+    }
+'''
+    source.write_text(text.replace(marker, patch + marker))
+    cargo = project / "Cargo.toml"
+    text = cargo.read_text()
+    if "[patch.crates-io]" in text:
+        raise ValueError("upstream workspace patches changed; review core override")
+    cargo.write_text(text + '\n[patch.crates-io]\n'
+                     'tree-sitter-language-pack = { path = "vendor/tree-sitter-language-pack-1.13.3" }\n')
+    return {"core_patch": "resolve-nested-C-C++-declarators",
+            "patched_intelligence_sha256": sha256(source)}
 
 
 def build_environment(prefix: Path, version: str, api: int, cc: str,
@@ -198,11 +235,13 @@ def main(argv=None):
         parser.error("output directory must be empty")
     wrapper = fetch_source(manifest["python_source"], args.cache)
     bundle = fetch_source(manifest["grammar_source"], args.cache)
+    core = fetch_source(manifest["core_source"], args.cache)
     args.out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="android-language-pack-") as temporary:
         directory = Path(temporary)
         project = unpack_source(wrapper, directory / "source")
         patches = patch_offline(project)
+        patches.update(patch_cpp_names(project, core))
         env = build_environment(args.target_prefix.resolve(), args.python_version,
                                 args.android_api, args.cc, bundle, manifest["languages"])
         env["CARGO_TARGET_DIR"] = str(directory / "target")

@@ -126,5 +126,12 @@
       "language": "tsx",
       "repo": "tree-sitter/tree-sitter-typescript"
     }
-  ]
+  ],
+  "core_source": {
+    "name": "tree-sitter-language-pack-core",
+    "version": "1.13.3",
+    "filename": "tree-sitter-language-pack-1.13.3.crate",
+    "url": "https://static.crates.io/crates/tree-sitter-language-pack/tree-sitter-language-pack-1.13.3.crate",
+    "sha256": "345ee6dd864ca9f9e846120d5546082a27e946e1b129a55e7c6d4b1fc5cddec3"
+  }
 }
