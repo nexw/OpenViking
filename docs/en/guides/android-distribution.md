@@ -10,8 +10,17 @@ release**. This document tracks the remaining work rather than treating
 - CPython 3.14, with the exact minor's `libpython3.14.so` available.
 - No manylinux/glibc wheel relabeling, placeholder distributions, or parser shims.
 - Native extension wheels linked to versioned libpython use conservative
-  `cp314-cp314` tags. The earlier OpenViking native prototype still needs its
-  overly broad abi3 tag corrected before general distribution.
+  `cp314-cp314` tags, including the OpenViking and standalone RAGFS wheels.
+  Both filename and internal metadata reflect their actual API/minor linkage.
+
+The updated native artifact from
+https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44208357709
+passed container/payload SHA256 checks and private Termux CPython 3.14.10 tests:
+C++ KV/vector/packed-filter operations, bundled and standalone RAGFS
+health/mount/read/write/list, and the static musl CLI. Neither RAGFS layout needed
+LD_PRELOAD. Installed native payload hashes also matched the verified wheel.
+This is **native-component-only acceptance**: the OpenViking wheel was installed
+without its unfinished dependency closure, not accepted as an application.
 
 ## Stage 1: standalone parser dependencies
 
@@ -188,16 +197,29 @@ upstream enables the workflows.
 ## Stage 3: foundational Rust dependencies
 
 The opt-in `Android Rust Dependency Wheels` workflow builds the current audited
-closure's `orjson==3.13.0`, `pydantic-core==2.50.4`, `jiter==0.19.0` and
-`rpds-py==2026.9.1`. It preserves their real upstream maturin/PyO3 modules and
+closure's `orjson==3.13.0`, `pydantic-core==2.50.4`, `jiter==0.19.0`,
+`rpds-py==2026.9.1`, `fastuuid==0.14.0` and `frostwork==0.2.2`. It preserves their real upstream maturin/PyO3 modules and
 shipped Cargo locks. The support wheel `typing-extensions==4.16.0` is mirrored
 unchanged for normal offline dependency resolution. The actual NDK artifact from
 https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44033731115
 passed SHA256 verification, a fresh five-package offline/binary-only install
 with normal dependency resolution, `uv pip check`, and all four real functional
-tests on private Termux CPython 3.14.10 without LD_PRELOAD. The shared Rust
-cross-environment also passed the language-pack rebuild:
+tests on private Termux CPython 3.14.10 without LD_PRELOAD. The expanded artifact
+from https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44215606731
+also passed API-pinned container and payload checksums, a fresh **seven-package**
+normal-resolution offline/binary-only install, `uv pip check`, and all six
+shipped functional checks. The shared Rust cross-environment also passed the language-pack rebuild:
 https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44032288106
+
+Notice collection now forwards the exact maturin Cargo features and selected
+binding manifest instead of collecting default-feature metadata. This matters
+for optional Python bridges such as frostwork's and other feature-specific
+dependencies: a functional native wheel must not omit its PyO3/FFI license files. It does not implicitly enable
+`--all-features` or frostwork's `mutate` feature. The corresponding language-pack
+repeat also passed:
+https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44217272172
+Full bridge license files and every recorded Rust notice hash were checked in
+the downloaded six-package and language-pack wheels.
 
 The orjson build script uses build-host cfg for AVX-512 selection; a guarded
 source patch makes this decision use Cargo's target architecture/OS instead.
@@ -209,23 +231,28 @@ resolve new versions silently. The separate source manifest uses the successful
 ```sh
 sha256sum -c SHA256SUMS
 python -m pip install --no-index --only-binary=:all: --find-links . \\
-  orjson==3.13.0 pydantic-core==2.50.4 jiter==0.19.0 rpds-py==2026.9.1
+  orjson==3.13.0 pydantic-core==2.50.4 jiter==0.19.0 rpds-py==2026.9.1 \\
+  fastuuid==0.14.0 frostwork==0.2.2
 python android_rust_smoke.py --manifest source-manifest.json --output rust-smoke.json
 ```
 
 The functional test checks JSON roundtrips/error handling, actual pydantic-core
 validation/serialization, and persistent Rust map/set operations—not just
-imports. Fastuuid needs its upstream `uuid_unstable` cfg preserved, and tiktoken
-needs a setuptools-rust adapter plus a reviewed Cargo lock; neither is silently
-substituted into this maturin-only stage.
+imports. It also compares native UUID4/UUID5 behavior with stdlib, and exercises
+native HTML entity/encoding extraction and URL navigation, including frostwork's
+public dataclass API. Fastuuid's reviewed `target.'cfg(all())'` configuration is
+hash-checked and its `uuid_unstable` cfg preserved only for the Android target.
+Frostwork keeps its upstream `python` feature without enabling `mutate`.
+Tiktoken still needs a setuptools-rust adapter plus a reviewed Cargo lock; it is
+not silently substituted into this maturin-only stage.
 
 ## Stage 4: unchanged published wheels
 
 `android_published_wheels.json` freezes filenames, source URLs and hashes for
 286 compatible wheels: 281 pure wheels and five published Android wheels. Its
-36-item source-build queue includes the 16 native distributions covered by the
-parser/language-pack/foundational-Rust stages; **20 native distributions remain**
-until further builders pass acceptance. The queue is explicit data, never
+36-item source-build queue includes the **20 device-accepted source builds**
+covered by the parser/language-pack/Rust/pure stages; **16 distributions remain**
+without accepted wheels. The queue is explicit data, never
 placeholder wheels. Both queues partition the same 322-dependency constraints.
 
 The opt-in `Android Published Dependency Wheels` workflow mirrors these upstream
@@ -233,7 +260,12 @@ wheels unchanged. It checks target tags (including compatible lower Android API
 levels), Requires-Python, metadata, CRC and native ELF dependencies without
 executing their code. No Linux wheel is relabeled. This download-only stage does
 not need a target sysroot or NDK; downloading the published subset is not a full
-installation or service test.
+installation or service test. The corrected full mirror run
+https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44208350693
+passed all 286 inspections; its downloaded container and 290 payload files also
+passed their SHA256 checks. Vendored nested `.dist-info` directories (such as in
+`py==1.11.0`) are retained unchanged, not confused with root wheel metadata;
+multiple root distributions are still rejected.
 
 ## Stage 5: genuine upstream pure backends
 
@@ -264,7 +296,33 @@ python android_pure_smoke.py --manifest source-manifest.json --implementation py
 Start each smoke command with `RAPIDFUZZ_IMPLEMENTATION` unset. Tests exercise
 safe YAML Unicode roundtrips/unsafe-constructor rejection and real pure-Python
 fuzzy matching/edit distances/extraction, including default backend selection.
-This implementation is not yet counted as device-accepted coverage.
+The artifact from
+https://github.com/nexw/openviking-android-prebuild-verify/actions/runs/44211262709
+passed the API-pinned ZIP hash **before extraction**, then every payload hash,
+a fresh two-package normal-resolution offline/binary-only device install,
+`uv pip check`, and both shipped smoke modes on private Termux CPython 3.14.10.
+Together with the other stages, this supplies **306 of 322 dependency wheels**;
+it is not evidence that the whole application installs or starts.
+
+### Combined component gate and the remaining application blocker
+
+A fresh private Termux CPython 3.14.10 environment normally resolved **23
+packages** offline/binary-only: the 20 source-built distributions plus
+`grep-ast`, `pathspec` and `typing-extensions`. `uv pip check` passed, followed by
+the shipped standalone parser, network-denied language-pack/grep-ast, six Rust,
+and both pure-backend smoke modes. No inherited site-packages or LD_PRELOAD were
+used. This gate uses the feature-corrected notice artifacts above.
+
+The separate fresh **application** dry-run, using the native OpenViking wheel
+and all 306 available dependency wheels, still fails normal offline resolution:
+`firecrawl-anydoc==0.2.4` is not available. Nothing was installed by that dry-run;
+service startup/health and full ingestion remain unaccepted. The 16 missing
+wheel names are:
+
+- Rust/adapters: `firecrawl-anydoc`, `hf-xet`, `litellm`, `tiktoken`, `tokenizers`.
+- C/C++/native prerequisites: `argon2-cffi-bindings`, `brotli`, `cffi`,
+  `cryptography`, `grpcio`, `lxml`, `pillow`, `pycares`, `pycryptodome`, `regex`,
+  `zope-interface`.
 
 ## Full-distribution acceptance criteria
 
