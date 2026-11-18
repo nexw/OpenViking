@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -20,8 +19,14 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from scripts.build_support.android_parser_wheels import fetch_source, inspect_wheel, sha256, unpack_source
+from scripts.build_support.android_parser_wheels import (
+    fetch_source,
+    inspect_wheel,
+    sha256,
+    unpack_source,
+)
 from scripts.build_support.android_rust_common import build_environment as rust_environment
+from scripts.build_support.android_rust_common import maturin_cargo_options
 
 DEFAULT_MANIFEST = Path(__file__).with_name("android_language_pack_sources.json")
 OFFLINE_ERROR = (
@@ -156,9 +161,13 @@ def include_notices(project: Path, wheel: Path, manifest: dict, cache: Path,
         destination = notices / "embedded-grammars" / source["filename"]
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(text.read_bytes())
+    options = maturin_cargo_options(project)
+    # Match tool.maturin.manifest-path, not the virtual workspace's defaults.
+    cargo_manifest = project / "crates/ts-pack-core-py/Cargo.toml"
     metadata = json.loads(subprocess.check_output(
         ["cargo", "metadata", "--locked", "--format-version", "1",
-         "--filter-platform", "aarch64-linux-android"], cwd=project, env=env, text=True,
+         "--filter-platform", "aarch64-linux-android", "--manifest-path", str(cargo_manifest),
+         *options], cwd=project, env=env, text=True,
     ))
     packages = []
     for package in metadata["packages"]:
@@ -182,6 +191,8 @@ def include_notices(project: Path, wheel: Path, manifest: dict, cache: Path,
                          "notices": copied})
     (dist_info / "ANDROID-THIRD-PARTY.json").write_text(json.dumps({
         "grammars": manifest["grammar_licenses"], "rust_packages": packages,
+        "cargo_metadata_options": options,
+        "cargo_manifest": cargo_manifest.relative_to(project).as_posix(),
     }, indent=2) + "\n")
     (dist_info / "ANDROID-OFFLINE.json").write_text(json.dumps({
         "embedded_languages": manifest["languages"], "disabled_apis": list(DOWNLOAD_APIS),

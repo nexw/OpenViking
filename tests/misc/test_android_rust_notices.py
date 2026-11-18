@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from scripts.build_support import android_language_pack as pack
 from scripts.build_support import android_rust_common as common
 
 
@@ -46,6 +47,34 @@ class NoticeFeatureTests(unittest.TestCase):
                         'features = [1]', 'all-features = "false"', 'no-default-features = 1'):
             with self.subTest(setting=setting), self.assertRaises(ValueError):
                 self.config('[tool.maturin]\n' + setting + '\n')
+
+    def test_language_pack_uses_binding_manifest_and_same_maturin_features(self):
+        self.config('[tool.maturin]\nfeatures = ["pyo3/extension-module", "pyo3/abi3-py310"]\n')
+        cargo_manifest = self.project / "crates/ts-pack-core-py/Cargo.toml"
+        cargo_manifest.parent.mkdir(parents=True)
+        cargo_manifest.write_text('[package]\nname="fixture"\nversion="0.1.0"\n')
+        directory = self.root / "work"
+        directory.mkdir()
+        dist_info = directory / "unpacked" / "fixture" / "fixture-0.1.0.dist-info"
+
+        def command(argv, **kwargs):
+            if "unpack" in argv:
+                dist_info.mkdir(parents=True)
+
+        def metadata(argv, **kwargs):
+            self.assertEqual(argv[argv.index("--manifest-path") + 1], str(cargo_manifest))
+            self.assertEqual(argv[-2:], ["--features", "pyo3/extension-module,pyo3/abi3-py310"])
+            self.assertNotIn("--all-features", argv)
+            return json.dumps({"packages": []})
+
+        with mock.patch.object(pack.subprocess, "run", side_effect=command), \
+                mock.patch.object(pack.subprocess, "check_output", side_effect=metadata):
+            pack.include_notices(self.project, self.root / "inert.whl", {"grammar_licenses": [],
+                                 "languages": []}, self.root / "cache", directory, {})
+        result = json.loads((dist_info / "ANDROID-THIRD-PARTY.json").read_text())
+        self.assertEqual(result["cargo_manifest"], "crates/ts-pack-core-py/Cargo.toml")
+        self.assertEqual(result["cargo_metadata_options"],
+                         ["--features", "pyo3/extension-module,pyo3/abi3-py310"])
 
     def test_feature_selected_pyo3_notice_is_physically_copied_and_recorded(self):
         self.config('[tool.maturin]\nfeatures = ["python"]\n')
