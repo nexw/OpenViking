@@ -19,6 +19,8 @@ import zipfile
 from email.parser import BytesParser
 from pathlib import Path
 
+import tomllib
+
 from scripts.build_support.android_parser_wheels import (
     fetch_source,
     inspect_wheel,
@@ -28,6 +30,13 @@ from scripts.build_support.android_parser_wheels import (
 from scripts.build_support.android_rust_common import TARGET, build_environment, include_notices
 
 DEFAULT_MANIFEST = Path(__file__).with_name("android_rust_sources.json")
+TARGET_RUSTFLAGS = "CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS"
+# This is an allowlist for ONE inspected upstream config, not arbitrary source flags.
+FASTUUID_CONFIG = {
+    "path": ".cargo/config.toml",
+    "sha256": "92e6eb2c8c94adc5388fcc8dd595ee62516d86441eab6a46e4389f520be950d8",
+    "required_rustflags": ["--cfg", "uuid_unstable"],
+}
 
 
 def canonical_name(name: str) -> str:
@@ -48,7 +57,8 @@ def inspect_metadata(wheel: Path, source: dict, *, pure: bool = False) -> dict:
                     or any(part in ("", ".", "..") for part in name.rstrip("/").split("/"))
                     or stat.S_ISLNK(member.external_attr >> 16)):
                 raise ValueError(f"unsafe wheel ZIP member: {name}")
-        metadata_files = [name for name in names if name.endswith(".dist-info/METADATA")]
+        metadata_files = [name for name in names if name.count("/") == 1
+                          and name.endswith(".dist-info/METADATA")]
         if len(metadata_files) != 1:
             raise ValueError(f"missing or ambiguous METADATA: {wheel.name}")
         metadata = BytesParser().parsebytes(archive.read(metadata_files[0]))
@@ -57,7 +67,8 @@ def inspect_metadata(wheel: Path, source: dict, *, pure: bool = False) -> dict:
                 or metadata["Version"] != source["version"]):
             raise ValueError(f"wheel metadata disagrees with source manifest: {wheel.name}")
         if pure:
-            wheel_files = [name for name in names if name.endswith(".dist-info/WHEEL")]
+            wheel_files = [name for name in names if name.count("/") == 1
+                           and name.endswith(".dist-info/WHEEL")]
             if len(wheel_files) != 1:
                 raise ValueError(f"missing or ambiguous WHEEL metadata: {wheel.name}")
             info = BytesParser().parsebytes(archive.read(wheel_files[0]))
@@ -93,6 +104,38 @@ def verified_lock(source: dict, manifest_dir: Path) -> Path | None:
     return path
 
 
+def reviewed_cargo_config(source: dict) -> dict | None:
+    """Fail closed on missing fastuuid policy or any unreviewed descriptor."""
+    config = source.get("preserve_cargo_config")
+    fastuuid = canonical_name(source["name"]) == "fastuuid"
+    if not fastuuid and "preserve_cargo_config" not in source:
+        return None
+    if (not fastuuid or source["version"] != "0.14.0" or config != FASTUUID_CONFIG):
+        raise ValueError("unreviewed preserve_cargo_config; require fastuuid 0.14.0's exact policy")
+    return config
+
+
+def verified_cargo_config(project: Path, source: dict) -> dict:
+    """Verify bytes AND parsed semantics; never rewrite the upstream config.
+
+    The official fastuuid 0.14.0 sdist uses target.'cfg(all())', NOT build.rustflags.
+    Cargo's exact-target environment flags override that table, so its reviewed
+    tokens must also be carried into our Android-only environment variable.
+    """
+    config = reviewed_cargo_config(source)
+    if config is None:
+        return {}
+    path = _relative_file(project, config["path"])
+    if sha256(path) != config["sha256"]:
+        raise ValueError("source Cargo config checksum mismatch")
+    parsed = tomllib.loads(path.read_text(encoding="utf-8"))
+    expected = {"target": {"cfg(all())": {"rustflags": config["required_rustflags"]}}}
+    if parsed != expected:
+        raise ValueError("source Cargo config rustflags changed; review upstream semantics")
+    return {"path": config["path"], "sha256": sha256(path),
+            "required_rustflags": list(config["required_rustflags"])}
+
+
 def patch_source(project: Path, source: dict) -> dict:
     """Only reviewed, exact-match source adaptations are permitted."""
     patch = source.get("patch")
@@ -123,6 +166,7 @@ def build_one(source: dict, prefix: Path, version: str, api: int, cc: str,
               manifest_dir: Path = DEFAULT_MANIFEST.parent) -> dict:
     """Build one real upstream module; all outputs go to the private batch stage."""
     external_lock = verified_lock(source, manifest_dir)
+    reviewed_cargo_config(source)
     archive = fetch_source(source, cache)
     # Only the final batch stage must share the output filesystem. Extracting a
     # standalone crate below the repository would make Cargo inherit OpenViking's
@@ -130,6 +174,7 @@ def build_one(source: dict, prefix: Path, version: str, api: int, cc: str,
     with tempfile.TemporaryDirectory(prefix="android-rust-build-") as temporary:
         directory = Path(temporary)
         project = unpack_source(archive, directory / "source")
+        config = verified_cargo_config(project, source)
         patches = patch_source(project, source)
         cargo_manifest = _relative_file(project, source.get("cargo_manifest", "Cargo.toml"))
         lock = project / "Cargo.lock"
@@ -148,6 +193,8 @@ def build_one(source: dict, prefix: Path, version: str, api: int, cc: str,
             raise ValueError(f"missing workspace Cargo.lock: {source['name']}; supply a pinned override")
         lock_hash = sha256(lock)
         env = build_environment(prefix, version, api, cc, directory / "target")
+        if config:
+            env[TARGET_RUSTFLAGS] += " " + " ".join(config["required_rustflags"])
         wheels = directory / "wheels"
         # No --features/--no-default-features: retain the upstream pyproject policy.
         subprocess.run([sys.executable, "-m", "maturin", "build", "--release", "--locked",
@@ -155,6 +202,7 @@ def build_one(source: dict, prefix: Path, version: str, api: int, cc: str,
                         "--out", str(wheels)], cwd=project, env=env, check=True)
         if not lock.is_file() or sha256(lock) != lock_hash:
             raise ValueError("workspace Cargo.lock changed during the locked build")
+        verified_cargo_config(project, source)
         built = list(wheels.glob("*.whl"))
         if len(built) != 1:
             raise ValueError(f"expected one wheel for {source['name']}")
@@ -171,6 +219,7 @@ def build_one(source: dict, prefix: Path, version: str, api: int, cc: str,
         notices = include_notices(project, wheel, directory, env, cargo_manifest)
         if not lock.is_file() or sha256(lock) != lock_hash:
             raise ValueError("workspace Cargo.lock changed while collecting notices")
+        verified_cargo_config(project, source)
         identity = inspect_metadata(wheel, source)
         result = inspect_wheel(wheel, version, api, readelf)
         lock_name = f"{canonical_name(source['name'])}-{source['version']}.Cargo.lock"
@@ -187,6 +236,8 @@ def build_one(source: dict, prefix: Path, version: str, api: int, cc: str,
             "notices": notices,
             "rustc": subprocess.check_output(["rustc", "-vV"], cwd=project, env=env, text=True),
         })
+        if config:
+            result["preserved_cargo_config"] = config
         shutil.copyfile(wheel, output / wheel.name)
         return result
 
@@ -248,6 +299,7 @@ def main(argv=None):
     manifest_dir = args.manifest.resolve().parent
     for source in sources:
         verified_lock(source, manifest_dir)
+        reviewed_cargo_config(source)
     if args.out.exists() and (not args.out.is_dir() or any(args.out.iterdir())):
         parser.error("output directory must be empty")
     args.out.mkdir(parents=True, exist_ok=True)

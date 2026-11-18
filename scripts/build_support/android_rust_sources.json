@@ -57,6 +57,39 @@
         "format": 4,
         "packages": 19
       }
+    },
+    {
+      "name": "fastuuid",
+      "version": "0.14.0",
+      "url": "https://files.pythonhosted.org/packages/c3/7d/d9daedf0f2ebcacd20d599928f8913e9d2aea1d56d2d355a93bfa2b611d7/fastuuid-0.14.0.tar.gz",
+      "sha256": "178947fc2f995b38497a74172adee64fdeb8b7ec18f2a5934d037641ba265d26",
+      "filename": "fastuuid-0.14.0.tar.gz",
+      "cargo_manifest": "Cargo.toml",
+      "sdist_cargo_lock": {
+        "path": "Cargo.lock",
+        "sha256": "8c30c9686cf96793eb3995f213e8ae4d4d694964bc2a02b50d9ce16b7ed7763b",
+        "format": 4,
+        "packages": 52
+      },
+      "preserve_cargo_config": {
+        "path": ".cargo/config.toml",
+        "sha256": "92e6eb2c8c94adc5388fcc8dd595ee62516d86441eab6a46e4389f520be950d8",
+        "required_rustflags": ["--cfg", "uuid_unstable"]
+      }
+    },
+    {
+      "name": "frostwork",
+      "version": "0.2.2",
+      "url": "https://files.pythonhosted.org/packages/00/df/dc5971ef6c3025ac0734eb4552abbb45adaa6a410733f8119293d99f4e84/frostwork-0.2.2.tar.gz",
+      "sha256": "da4ac35a703b68a6fd1ad92dba53abeed4d38bcfaa5125b6f7f50b4405de7066",
+      "filename": "frostwork-0.2.2.tar.gz",
+      "cargo_manifest": "Cargo.toml",
+      "sdist_cargo_lock": {
+        "path": "Cargo.lock",
+        "sha256": "008cc09152b0de5cfa0a56928a659dc7ec8aae9ffb19ef6d45b5f72334f0c167",
+        "format": 4,
+        "packages": 54
+      }
     }
   ],
   "support_wheels": [

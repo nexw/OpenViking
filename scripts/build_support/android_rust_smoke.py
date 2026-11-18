@@ -70,8 +70,52 @@ def check_rpds():
     return "rpds" if rpds.__file__.endswith(".so") else "rpds.rpds"
 
 
+def check_fastuuid():
+    import uuid
+
+    import fastuuid
+
+    random = fastuuid.uuid4()
+    standard = uuid.UUID(bytes=random.bytes)
+    assert random.version == standard.version == 4
+    assert standard.variant == uuid.RFC_4122
+    assert str(random) == str(standard)
+    assert fastuuid.UUID(bytes=random.bytes).int == standard.int
+    # The upstream API takes a native UUID namespace and BYTES, unlike stdlib.
+    namespace = fastuuid.UUID(bytes=uuid.NAMESPACE_DNS.bytes)
+    named = fastuuid.uuid5(namespace, b"python.org")
+    expected = uuid.uuid5(uuid.NAMESPACE_DNS, "python.org")
+    assert named.version == 5
+    assert named.bytes == expected.bytes
+    assert str(named) == str(expected) == "886313e1-3b8a-5372-9b90-0c9aee199e5d"
+    return "fastuuid" if fastuuid.__file__.endswith(".so") else "fastuuid.fastuuid"
+
+
+def check_frostwork():
+    import frostwork
+    from frostwork import _frostwork as native
+
+    # Exercise native entity decoding + WHATWG encoding with no optional extras.
+    text = '<meta charset="windows-1252"><p>caf\u00e9 &amp; tea &#x20ac;</p>'
+    body = text.encode("cp1252")
+    assert native.detect_encoding(body) == "windows-1252"
+    decoded = native.decode(body, "windows-1252")
+    assert decoded == text and decoded.encode("cp1252") == body
+    expected = [["caf\u00e9 & tea \u20ac;"]]
+    assert native.extract(body, ["p::text"]) == expected
+    assert frostwork.extract(decoded, ["//p/text()"]) == expected
+    # The genuine URL API resolves relative URLs against the document's base.
+    html = b'<base href="/shop/"><meta http-equiv="refresh" content="5;url=sale">'
+    url = "https://example.com/p"
+    navigation = ("https://example.com/shop/", (5.0, "https://example.com/shop/sale"))
+    assert native.navigation(html, url) == navigation
+    assert frostwork.navigation(html, url) == navigation
+    return "frostwork._frostwork"
+
+
 CHECKS = {"orjson": check_orjson, "pydantic-core": check_pydantic_core,
-          "jiter": check_jiter, "rpds-py": check_rpds}
+          "jiter": check_jiter, "rpds-py": check_rpds,
+          "fastuuid": check_fastuuid, "frostwork": check_frostwork}
 
 
 def main(argv=None):

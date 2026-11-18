@@ -166,8 +166,10 @@ def inspect_published_wheel(wheel: Path, source: dict, target: dict,
     _requires_python(source["requires_python"], target)
     identity = inspect_metadata(wheel, source, pure=False)
     with zipfile.ZipFile(wheel) as archive:
-        wheels = [name for name in archive.namelist() if name.endswith(".dist-info/WHEEL")]
-        metadata = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
+        wheels = [name for name in archive.namelist() if name.count("/") == 1
+                  and name.endswith(".dist-info/WHEEL")]
+        metadata = [name for name in archive.namelist() if name.count("/") == 1
+                    and name.endswith(".dist-info/METADATA")]
         if len(wheels) != 1 or wheels[0].rsplit("/", 1)[0] != metadata[0].rsplit("/", 1)[0]:
             raise ValueError("missing or ambiguous/co-located WHEEL metadata")
         info = BytesParser().parsebytes(archive.read(wheels[0]))

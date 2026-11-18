@@ -21,6 +21,7 @@ from scripts.build_support import android_rust_common as common
 from scripts.build_support import android_rust_wheels as rust
 
 HOST_MINOR = f"{sys.version_info.major}.{sys.version_info.minor}"
+FASTUUID_CONFIG_BYTES = b'[target.\'cfg(all())\']\nrustflags = ["--cfg", "uuid_unstable"]\n'
 ORJSON_AVX = """    #[cfg(all(target_arch = "x86_64", not(target_os = "macos")))]
     if is_64_bit_python {
         println!("cargo:rustc-cfg=feature=\\"avx512\\"");
@@ -231,17 +232,19 @@ class MetadataTests(OfflineCase):
 
 
 class SourceAndLockTests(OfflineCase):
-    def test_current_first_four_manifest_pins_and_original_locks(self):
+    def test_current_six_manifest_pins_and_original_locks(self):
         manifest = json.loads(rust.DEFAULT_MANIFEST.read_text())
         self.assertEqual(manifest["schema"], 1)
         self.assertEqual(
-            [(p["name"], p["version"]) for p in manifest["packages"]],
-            [
-                ("orjson", "3.13.0"),
-                ("pydantic-core", "2.50.4"),
-                ("jiter", "0.19.0"),
-                ("rpds-py", "2026.9.1"),
-            ],
+            {p["name"]: p["version"] for p in manifest["packages"]},
+            {
+                "orjson": "3.13.0",
+                "pydantic-core": "2.50.4",
+                "jiter": "0.19.0",
+                "rpds-py": "2026.9.1",
+                "fastuuid": "0.14.0",
+                "frostwork": "0.2.2",
+            },
         )
         for package in manifest["packages"]:
             with self.subTest(package=package["name"]):
@@ -253,6 +256,17 @@ class SourceAndLockTests(OfflineCase):
             manifest["packages"][2]["cargo_manifest"], "crates/jiter-python/Cargo.toml"
         )
         self.assertEqual(manifest["packages"][0]["patch"], "orjson-target-avx512")
+        fastuuid = manifest["packages"][4]
+        self.assertEqual(fastuuid["preserve_cargo_config"], rust.FASTUUID_CONFIG)
+        self.assertEqual(rust.FASTUUID_CONFIG["sha256"], digest(FASTUUID_CONFIG_BYTES))
+        self.assertEqual(
+            fastuuid["sdist_cargo_lock"]["sha256"],
+            "8c30c9686cf96793eb3995f213e8ae4d4d694964bc2a02b50d9ce16b7ed7763b",
+        )
+        self.assertEqual(
+            manifest["packages"][5]["sdist_cargo_lock"]["sha256"],
+            "008cc09152b0de5cfa0a56928a659dc7ec8aae9ffb19ef6d45b5f72334f0c167",
+        )
 
     def test_orjson_avx_patch_uses_cargo_target_not_build_host_cfg(self):
         build_rs = self.root / "build.rs"
@@ -554,6 +568,177 @@ class BuildContractTests(OfflineCase):
         out = self.root / "staged"
         out.mkdir()
         return project, archive, out
+
+    def config_project(self):
+        project, archive, out = self.project()
+        config = project / ".cargo/config.toml"
+        config.parent.mkdir()
+        config.write_bytes(FASTUUID_CONFIG_BYTES)
+        package = source(
+            "fastuuid", "0.14.0", preserve_cargo_config=dict(rust.FASTUUID_CONFIG)
+        )
+        return project, archive, out, package
+
+    def fixture_build(self, project, archive, out, package, on_maturin=None):
+        """Capture a build contract without running package code or native tools."""
+        commands = []
+        environment = {rust.TARGET_RUSTFLAGS: "-Lnative=/target/lib -Clink-arg=-lpython3.14"}
+
+        def run(command, **kwargs):
+            commands.append((command, kwargs))
+            if "maturin" in command:
+                if on_maturin:
+                    on_maturin(command, kwargs)
+                wheels = Path(command[command.index("--out") + 1])
+                wheels.mkdir()
+                metadata_wheel(
+                    wheels / "demo-1.0-py3-none-any.whl",
+                    name=package["name"], version=package["version"],
+                )
+
+        with (
+            mock.patch.object(rust, "fetch_source", return_value=archive),
+            mock.patch.object(rust, "unpack_source", return_value=project),
+            mock.patch.object(rust, "build_environment", return_value=environment),
+            mock.patch.object(rust.subprocess, "run", side_effect=run),
+            mock.patch.object(rust.subprocess, "check_output", return_value="rustc fixture\n"),
+            mock.patch.object(rust, "include_notices", return_value={}),
+            mock.patch.object(rust, "inspect_wheel", return_value={}),
+        ):
+            result = rust.build_one(
+                package, self.root, HOST_MINOR, 24, "clang", self.root, out, "readelf"
+            )
+        return result, commands
+
+    def test_config_policy_rejects_missing_unreviewed_flags_versions_and_paths_before_fetch(self):
+        config = rust.FASTUUID_CONFIG
+        packages = [
+            source("fastuuid", "0.14.0"),
+            source("fastuuid", "0.14.0", preserve_cargo_config=None),
+            source("fastuuid", "0.14.1", preserve_cargo_config=config),
+            source("other", preserve_cargo_config=config),
+        ]
+        for key, value in (
+            ("path", "../config.toml"),
+            ("sha256", "0" * 64),
+            ("required_rustflags", ["--cfg", "invented_feature"]),
+            ("required_rustflags", ["uuid_unstable", "--cfg"]),
+            ("extra", "not reviewed"),
+        ):
+            packages.append(source(
+                "fastuuid", "0.14.0", preserve_cargo_config={**config, key: value}
+            ))
+        with mock.patch.object(rust, "fetch_source") as fetch:
+            for package in packages:
+                with self.subTest(package=package), self.assertRaisesRegex(ValueError, "unreviewed"):
+                    rust.build_one(
+                        package, self.root, HOST_MINOR, 24, "clang", self.root, self.root, "readelf"
+                    )
+            fetch.assert_not_called()
+        # Whole-batch validation also happens before building or creating output.
+        with mock.patch.object(rust, "build_one") as build:
+            with self.assertRaisesRegex(ValueError, "unreviewed"):
+                rust.main(self.args(self.manifest([source(), packages[0]])))
+            build.assert_not_called()
+        self.assertFalse((self.root / "out").exists())
+
+    def test_config_missing_wrong_bytes_and_escaping_symlink_fail_before_maturin(self):
+        project, archive, out, package = self.config_project()
+        config = project / ".cargo/config.toml"
+        for contents in (None, FASTUUID_CONFIG_BYTES + b"# changed\n"):
+            if contents is None:
+                config.unlink()
+            else:
+                config.write_bytes(contents)
+            with (
+                self.subTest(contents=contents),
+                mock.patch.object(rust, "fetch_source", return_value=archive),
+                mock.patch.object(rust, "unpack_source", return_value=project),
+                mock.patch.object(rust, "build_environment") as environment,
+                mock.patch.object(rust.subprocess, "run") as run,
+            ):
+                with self.assertRaises(ValueError):
+                    rust.build_one(
+                        package, self.root, HOST_MINOR, 24, "clang", self.root, out, "readelf"
+                    )
+                environment.assert_not_called()
+                run.assert_not_called()
+                self.assertEqual(list(out.iterdir()), [])
+        config.unlink()
+        outside = self.root / "outside-config.toml"
+        outside.write_bytes(FASTUUID_CONFIG_BYTES)
+        config.symlink_to(outside)
+        with self.assertRaisesRegex(ValueError, "inside"):
+            rust.verified_cargo_config(project, package)
+
+    def test_config_toml_semantics_are_checked_independently_of_sha(self):
+        project, _, _, package = self.config_project()
+        config = project / ".cargo/config.toml"
+        # Mock ONLY the digest to prove TOML parsing independently rejects drift.
+        for contents in (
+            '[build]\nrustflags = ["--cfg", "uuid_unstable"]\n',
+            '[target.\'cfg(all())\']\nrustflags = ["--cfg", "other"]\n',
+            '[target.\'cfg(all())\']\nrustflags = "--cfg uuid_unstable"\n',
+            FASTUUID_CONFIG_BYTES.decode() + '[env]\nUNREVIEWED = "1"\n',
+            '[invalid TOML',
+        ):
+            config.write_text(contents)
+            with (
+                self.subTest(contents=contents),
+                mock.patch.object(rust, "sha256", return_value=rust.FASTUUID_CONFIG["sha256"]),
+                self.assertRaises(ValueError),
+            ):
+                rust.verified_cargo_config(project, package)
+
+    def test_config_tokens_reach_only_target_subprocess_flags_and_are_recorded(self):
+        project, archive, out, package = self.config_project()
+        original = (project / ".cargo/config.toml").read_bytes()
+        result, commands = self.fixture_build(project, archive, out, package)
+        command, kwargs = commands[0]
+        env = kwargs["env"]
+        self.assertEqual(
+            env[rust.TARGET_RUSTFLAGS].split(),
+            ["-Lnative=/target/lib", "-Clink-arg=-lpython3.14", "--cfg", "uuid_unstable"],
+        )
+        self.assertEqual(list(env), [rust.TARGET_RUSTFLAGS])
+        self.assertNotIn("RUSTFLAGS", env)
+        self.assertNotIn("CARGO_ENCODED_RUSTFLAGS", env)
+        self.assertNotIn("--features", command)
+        self.assertNotIn("--all-features", command)
+        self.assertNotIn("--no-default-features", command)
+        self.assertIn("--locked", command)
+        self.assertEqual(result["preserved_cargo_config"], rust.FASTUUID_CONFIG)
+        self.assertEqual((project / ".cargo/config.toml").read_bytes(), original)
+
+    def test_config_drift_during_locked_build_cannot_publish_a_wheel(self):
+        project, archive, out, package = self.config_project()
+
+        def change_config(command, kwargs):
+            (project / ".cargo/config.toml").write_bytes(FASTUUID_CONFIG_BYTES + b"# drift\n")
+
+        with self.assertRaisesRegex(ValueError, "config checksum"):
+            self.fixture_build(project, archive, out, package, change_config)
+        self.assertEqual(list(out.iterdir()), [])
+
+    def test_frostwork_leaves_pyproject_python_feature_and_empty_defaults_unchanged(self):
+        project, archive, out = self.project()
+        pyproject = project / "pyproject.toml"
+        policy = ('[tool.maturin]\nfeatures = ["python"]\n'
+                  'module-name = "frostwork._frostwork"\npython-source = "python"\n')
+        pyproject.write_text(policy)
+        cargo = project / "Cargo.toml"
+        cargo.write_text('[features]\npython = ["dep:pyo3"]\nmutate = []\n')
+        result, commands = self.fixture_build(
+            project, archive, out, source("frostwork", "0.2.2")
+        )
+        command, kwargs = commands[0]
+        for flag in ("--features", "--all-features", "--no-default-features"):
+            self.assertNotIn(flag, command)
+        self.assertNotIn("mutate", " ".join(command))
+        self.assertNotIn("uuid_unstable", kwargs["env"][rust.TARGET_RUSTFLAGS])
+        self.assertEqual(pyproject.read_text(), policy)
+        self.assertEqual(cargo.read_text(), '[features]\npython = ["dep:pyo3"]\nmutate = []\n')
+        self.assertNotIn("preserved_cargo_config", result)
 
     def test_locked_build_archives_unchanged_sdist_lock_and_preserves_upstream_features(self):
         project, archive, out = self.project()

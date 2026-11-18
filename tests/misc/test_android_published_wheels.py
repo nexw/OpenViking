@@ -309,6 +309,24 @@ class PackagingIntegrationTests(OfflineCase):
         with self.assertRaisesRegex(ValueError, "filename disagrees"):
             self.inspect(wheel, source)
 
+    def test_vendored_dist_info_is_not_confused_with_root_distribution(self):
+        wheel, source = self.source_wheel(extra={
+            "demo/_vendor/other-2.0.dist-info/METADATA": b"Name: other\nVersion: 2.0\n",
+            "demo/_vendor/other-2.0.dist-info/WHEEL": b"Tag: py2-none-any\n",
+        })
+        result = self.inspect(wheel, source)
+        self.assertEqual((result["name"], result["version"]), ("demo", "1.0"))
+        with zipfile.ZipFile(wheel) as archive:
+            self.assertIn("demo/_vendor/other-2.0.dist-info/METADATA", archive.namelist())
+
+    def test_multiple_root_metadata_directories_remain_rejected(self):
+        wheel, source = self.source_wheel(extra={
+            "other-2.0.dist-info/METADATA": b"Name: other\nVersion: 2.0\n",
+            "other-2.0.dist-info/WHEEL": b"Tag: py3-none-any\n",
+        })
+        with self.assertRaisesRegex(ValueError, "ambiguous METADATA"):
+            self.inspect(wheel, source)
+
     def test_requires_python_checked_against_target_patch_in_lock_and_metadata(self):
         wheel, source = self.source_wheel()
         for requirement in (">=3.15", "<3.14.10", "!=3.14.10"):
