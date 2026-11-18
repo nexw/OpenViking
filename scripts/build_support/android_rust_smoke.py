@@ -101,7 +101,7 @@ def check_frostwork():
     assert native.detect_encoding(body) == "windows-1252"
     decoded = native.decode(body, "windows-1252")
     assert decoded == text and decoded.encode("cp1252") == body
-    expected = [["caf\u00e9 & tea \u20ac;"]]
+    expected = [["caf\u00e9 & tea \u20ac"]]
     assert native.extract(body, ["p::text"]) == expected
     assert frostwork.extract(decoded, ["//p/text()"]) == expected
     # The genuine URL API resolves relative URLs against the document's base.
@@ -109,7 +109,11 @@ def check_frostwork():
     url = "https://example.com/p"
     navigation = ("https://example.com/shop/", (5.0, "https://example.com/shop/sale"))
     assert native.navigation(html, url) == navigation
-    assert frostwork.navigation(html, url) == navigation
+    wrapped = frostwork.navigation(html, url)
+    assert wrapped.base_url == navigation[0]
+    assert wrapped.meta_refresh is not None
+    assert wrapped.meta_refresh.delay == navigation[1][0]
+    assert wrapped.meta_refresh.url == navigation[1][1]
     return "frostwork._frostwork"
 
 

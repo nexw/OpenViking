@@ -235,6 +235,37 @@ executing their code. No Linux wheel is relabeled. This download-only stage does
 not need a target sysroot or NDK; downloading the published subset is not a full
 installation or service test.
 
+## Stage 5: genuine upstream pure backends
+
+The opt-in `Android Upstream Pure Dependency Wheels` workflow builds
+`PyYAML==6.0.3` and `RapidFuzz==3.14.6` through their unchanged PEP 517 backends:
+
+- PyYAML: `PYYAML_FORCE_LIBYAML=0` explicitly disables libyaml extensions.
+  Do not rely on an optional compilation failure or the CLI flag alone.
+- RapidFuzz: scikit-build-core's explicit `wheel.cmake=false` skips CMake.
+  `RAPIDFUZZ_BUILD_EXTENSION=0` only allows a failed-build fallback, and
+  `RAPIDFUZZ_IMPLEMENTATION=python` is a runtime selector, not a build switch.
+
+The builder pins source archives/backends, rejects foreign cross-build settings,
+requires naturally produced `py3-none-any` filename/internal tags, checks CRC,
+identity/Requires-Python and all payloads for native code, and requires the full
+upstream LICENSE bytes. It neither repacks nor retags these wheels. Publication
+is atomic for the entire batch. CI's fresh normal-resolution offline host check
+is explicitly separate from Android device/application acceptance.
+
+```sh
+sha256sum -c SHA256SUMS
+python -m pip install --no-index --only-binary=:all: --find-links . \\
+  pyyaml==6.0.3 rapidfuzz==3.14.6
+python android_pure_smoke.py --manifest source-manifest.json
+python android_pure_smoke.py --manifest source-manifest.json --implementation python
+```
+
+Start each smoke command with `RAPIDFUZZ_IMPLEMENTATION` unset. Tests exercise
+safe YAML Unicode roundtrips/unsafe-constructor rejection and real pure-Python
+fuzzy matching/edit distances/extraction, including default backend selection.
+This implementation is not yet counted as device-accepted coverage.
+
 ## Full-distribution acceptance criteria
 
 Do not label a bundle generally distributable until all of these pass:

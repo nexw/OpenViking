@@ -1,0 +1,73 @@
+name: Android Upstream Pure Dependency Wheels
+
+# Explicit supported upstream pure builds, not failed native builds/retagging.
+# This is only a dependency subset; full Android application acceptance is separate.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  pure-wheels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test Android build helpers
+        run: python3 -m unittest discover -s tests/misc -p 'test_android*.py' -v
+      - uses: astral-sh/setup-uv@v7
+      - name: Load reviewed host interpreter
+        run: |
+          python3 -m scripts.build_support.android_target env --out "$RUNNER_TEMP/android-target.env"
+          cat "$RUNNER_TEMP/android-target.env" >> "$GITHUB_ENV"
+      - name: Set up pinned upstream build backends
+        run: |
+          set -euo pipefail
+          uv python install "$ANDROID_BUILD_PYTHON"
+          uv venv --python "$ANDROID_BUILD_PYTHON" "$RUNNER_TEMP/pure-build"
+          uv pip install --python "$RUNNER_TEMP/pure-build/bin/python" \
+            'build==1.6.1' 'setuptools==84.2.1' 'wheel==0.48.0' \
+            'Cython==3.3.1' 'scikit-build-core==1.1.2' 'packaging==26.3'
+      - name: Build authentic pure wheels through original PEP 517 backends
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pure-build/bin/python" -m scripts.build_support.android_pure_wheels \
+            --manifest scripts/build_support/android_pure_sources.json \
+            --cache "$RUNNER_TEMP/pure-cache" --out dist-android-pure
+      - name: Fresh normal-resolution offline host sanity check
+        run: |
+          set -euo pipefail
+          uv venv --python "$ANDROID_BUILD_PYTHON" "$RUNNER_TEMP/pure-check"
+          uv pip install --python "$RUNNER_TEMP/pure-check/bin/python" \
+            --no-index --only-binary :all: --find-links dist-android-pure \
+            'pyyaml==6.0.3' 'rapidfuzz==3.14.6'
+          uv pip check --python "$RUNNER_TEMP/pure-check/bin/python"
+          env -u RAPIDFUZZ_IMPLEMENTATION "$RUNNER_TEMP/pure-check/bin/python" -I \
+            scripts/build_support/android_pure_smoke.py > dist-android-pure/host-smoke-default.json
+          env -u RAPIDFUZZ_IMPLEMENTATION "$RUNNER_TEMP/pure-check/bin/python" -I \
+            scripts/build_support/android_pure_smoke.py --implementation python \
+            > dist-android-pure/host-smoke-python.json
+      - name: Include frozen inputs and checksums
+        run: |
+          set -euo pipefail
+          cp scripts/build_support/android_pure_sources.json dist-android-pure/source-manifest.json
+          cp scripts/build_support/android_pure_smoke.py dist-android-pure/
+          cp scripts/build_support/android_dependency_constraints.txt dist-android-pure/
+          cp docs/en/guides/android-distribution.md dist-android-pure/README.md
+          (cd dist-android-pure && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+          {
+            echo '### Genuine upstream pure dependency builds'
+            echo '- PyYAML: PYYAML_FORCE_LIBYAML=0, original _pyyaml_pep517 backend'
+            echo '- RapidFuzz: wheel.cmake=false, original scikit-build-core backend'
+            echo '- Natural py3-none-any tags; no native compilation fallback, wheel repair or retagging'
+            echo '- Full source license bytes and CRC/metadata/no-native-payload checks'
+            echo '- Host sanity checks are not Android device/application acceptance'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openviking-android-pure-wheels
+          path: dist-android-pure/
+          if-no-files-found: error
+          retention-days: 30
