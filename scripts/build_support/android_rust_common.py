@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import tomllib
+
 from scripts.build_support.android_parser_wheels import sha256
 
 TARGET = "aarch64-linux-android"
@@ -69,12 +71,40 @@ def _notice_files(root: Path, license_file: str | None = None) -> list[Path]:
     return sorted(files)
 
 
+def maturin_cargo_options(project: Path) -> list[str]:
+    """Resolve notices with the SAME Cargo features maturin reads for the build.
+
+    Default-only metadata omits optional dependencies such as frostwork's PyO3,
+    which is activated by tool.maturin.features=["python"]. Never substitute
+    --all-features: that would include unbuilt features (e.g. frostwork mutate).
+    """
+    pyproject = project / "pyproject.toml"
+    if not pyproject.is_file():
+        return []
+    config = tomllib.loads(pyproject.read_text()).get("tool", {}).get("maturin", {})
+    features = config.get("features", [])
+    if (not isinstance(features, list) or any(
+            not isinstance(feature, str)
+            or not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_-]*(?:/[A-Za-z0-9_][A-Za-z0-9_-]*)?", feature)
+            for feature in features)):
+        raise ValueError("invalid maturin Cargo features for notice resolution")
+    options = ["--features", ",".join(features)] if features else []
+    for setting in ("all-features", "no-default-features"):
+        value = config.get(setting, False)
+        if type(value) is not bool:
+            raise ValueError(f"maturin {setting} must be boolean")
+        if value:
+            options.append("--" + setting)
+    return options
+
+
 def include_notices(project: Path, wheel: Path, directory: Path, env: dict,
                     cargo_manifest: Path) -> dict:
     """Repack with real source/Cargo notices and SPDX metadata, updating RECORD."""
+    options = maturin_cargo_options(project)
     metadata = json.loads(subprocess.check_output(
         ["cargo", "metadata", "--locked", "--format-version", "1",
-         "--filter-platform", TARGET, "--manifest-path", str(cargo_manifest)],
+         "--filter-platform", TARGET, "--manifest-path", str(cargo_manifest), *options],
         cwd=project, env=env, text=True,
     ))
     if Path(metadata["workspace_root"]).resolve() != project.resolve():
@@ -114,9 +144,10 @@ def include_notices(project: Path, wheel: Path, directory: Path, env: dict,
                          "id": f"{package.get('source') or 'workspace'}#{package['name']}@{package['version']}",
                          "license": package.get("license"),
                          "source": package.get("source"), "notices": copied})
-    result = {"source_notices": source_notices, "rust_packages": packages}
+    result = {"source_notices": source_notices, "rust_packages": packages,
+              "cargo_metadata_options": options}
     (dist_info / "ANDROID-THIRD-PARTY.json").write_text(json.dumps(result, indent=2) + "\n")
     subprocess.run([sys.executable, "-m", "wheel", "pack", str(roots[0]),
                     "--dest-dir", str(wheel.parent)], check=True)
-    return {"rust_packages": len(packages),
+    return {"rust_packages": len(packages), "cargo_metadata_options": options,
             "metadata": f"{dist_info.name}/ANDROID-THIRD-PARTY.json"}
